@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Overlay: OFF"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/btn_request_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Request Overlay Permission" />
+
+        <Button
+            android:id="@+id/btn_start_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start Overlay" />
+
+        <Button
+            android:id="@+id/btn_stop_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Stop Overlay" />
+
+        <Button
+            android:id="@+id/btn_start_record"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start Recording" />
+
+        <Button
+            android:id="@+id/btn_manage_points"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Manage Block Points" />
+
+        <Button
+            android:id="@+id/btn_test_block"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Test Blocking" />
+
+        <Button
+            android:id="@+id/btn_toggle_debug"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Debug Overlay: OFF" />
+
+        <Button
+            android:id="@+id/btn_export_logs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Export Logs" />
+    </LinearLayout>
+
+</ScrollView>

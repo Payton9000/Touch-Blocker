@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Touch Blocker</string>
+    <string name="hint_volume_keys">Use Volume Up to start recording, Volume Down to stop.</string>
+</resources>
