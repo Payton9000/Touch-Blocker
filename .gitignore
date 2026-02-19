@@ -9,3 +9,9 @@
 /captures
 .externalNativeBuild
 /.idea/
+/gradle/wrapper/gradle-wrapper.jar
+/gradle/wrapper/gradle-wrapper.properties.bak
+/gradle/caches/
+/gradle/daemon/
+/gradle/gradle.properties
+/gradle/buildOutputCleanup/
