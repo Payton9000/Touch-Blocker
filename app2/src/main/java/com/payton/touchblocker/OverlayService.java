@@ -178,12 +178,22 @@ public class OverlayService extends Service {
                 sizePx,
                 sizePx,
                 windowType,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
         );
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // Keep overlay anchored to the physical display, including cutout areas.
+            params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = Math.round(px - half);
         params.y = Math.round(py - half);
+        Log.d(TAG, "buildParams pointId=" + point.getId()
+                + " resolved=(" + px + "," + py + ")"
+                + " windowXY=(" + params.x + "," + params.y + ")"
+                + " size=" + sizePx);
         return params;
     }
 
