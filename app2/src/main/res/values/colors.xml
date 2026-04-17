@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#3F51B5</color>
-    <color name="colorPrimaryDark">#303F9F</color>
-    <color name="colorAccent">#FF4081</color>
+    <color name="colorPrimary">#2563EB</color>
+    <color name="colorPrimaryDark">#1D4ED8</color>
+    <color name="colorAccent">#2563EB</color>
+    <color name="colorBackground">#F3F6FB</color>
+    <color name="colorBackgroundBottom">#E6EDF7</color>
+    <color name="colorSurface">#FFFFFFFF</color>
+    <color name="colorSurfaceMuted">#F7FAFF</color>
+    <color name="colorStroke">#D6E1F0</color>
+    <color name="colorStrokeStrong">#B4C4D8</color>
+    <color name="textPrimary">#142033</color>
+    <color name="textSecondary">#607086</color>
+    <color name="textOnPrimary">#FFFFFFFF</color>
+    <color name="primaryPressed">#1F54C7</color>
+    <color name="secondaryPressed">#EDF3FC</color>
+    <color name="danger">#D94B62</color>
+    <color name="dangerPressed">#C33E54</color>
+    <color name="infoChipBg">#E9F1FF</color>
+    <color name="infoChipText">#2451A6</color>
+    <color name="overlayPanelBg">#8AFFFFFF</color>
+    <color name="overlayLabelText">#516175</color>
+    <color name="overlayCaptionText">#314255</color>
 </resources>

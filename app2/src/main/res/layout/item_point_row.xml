@@ -1,71 +1,100 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<android.support.v7.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp">
+    android:layout_marginBottom="@dimen/space_l"
+    app:cardBackgroundColor="@color/colorSurface"
+    app:cardCornerRadius="@dimen/corner_medium"
+    app:cardElevation="4dp"
+    app:cardUseCompatPadding="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:padding="@dimen/space_l">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_point_title"
+                    style="@style/TextAppearance.App.CardTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Point #1" />
+
+                <TextView
+                    android:id="@+id/tv_point_size"
+                    style="@style/Widget.App.InfoChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_s"
+                    android:text="Size: Global" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/sw_enabled"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_m"
+                android:text="Enabled"
+                android:textColor="@color/textSecondary" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/tv_point_title"
-            android:layout_width="0dp"
+            style="@style/TextAppearance.App.Caption"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Point #1"
-            android:textStyle="bold" />
+            android:layout_marginTop="@dimen/space_m"
+            android:text="Move the slider only if this point needs a different block diameter." />
 
-        <Switch
-            android:id="@+id/sw_enabled"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Enabled" />
+            android:layout_marginTop="@dimen/space_l"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <SeekBar
+                android:id="@+id/sb_point_size"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="600"
+                android:progress="0" />
+
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_l"
+                android:background="@drawable/bg_info_chip"
+                android:padding="@dimen/space_m">
+
+                <com.payton.touchblocker.PreviewCircleView
+                    android:id="@+id/preview_point"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp" />
+            </FrameLayout>
+        </LinearLayout>
 
         <Button
             android:id="@+id/btn_delete"
+            style="@style/Widget.App.DangerOutlineButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_gravity="end"
+            android:layout_marginTop="@dimen/space_l"
             android:text="Delete" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/tv_point_size"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Size: Global" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <SeekBar
-            android:id="@+id/sb_point_size"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:max="600"
-            android:progress="0" />
-
-        <com.payton.touchblocker.PreviewCircleView
-            android:id="@+id/preview_point"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_marginStart="12dp" />
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="8dp"
-        android:background="#22000000" />
-
-</LinearLayout>
+</android.support.v7.widget.CardView>
