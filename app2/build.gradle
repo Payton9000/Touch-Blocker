@@ -2,16 +2,16 @@ apply plugin: 'com.android.application'
 
 android {
     namespace "com.payton.touchblocker"
-    compileSdkVersion 28
+    compileSdkVersion 33
 
 
 
     defaultConfig {
         applicationId "com.payton.touchblocker"
         minSdkVersion 17
-        targetSdkVersion 28
-        versionCode 3
-        versionName "1.0"
+        targetSdkVersion 33
+        versionCode 4
+        versionName "1.1"
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
 
