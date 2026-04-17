@@ -82,13 +82,13 @@ public class RecordingActivity extends AppCompatActivity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             recording = true;
-            tvHint.setText("Recording: ON (Volume Down to stop)");
+            tvHint.setText(getString(R.string.recording_on));
             Log.d(TAG, "Recording ON");
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
             recording = false;
-            tvHint.setText("Recording: OFF (Saved)");
+            tvHint.setText(getString(R.string.recording_off_saved));
             Log.d(TAG, "Recording OFF");
             finish();
             return true;

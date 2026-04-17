@@ -26,7 +26,7 @@ public class OverlayPermission {
         if (canDrawOverlays(activity)) {
             return true;
         }
-        Toast.makeText(activity, "Please grant overlay permission", Toast.LENGTH_SHORT).show();
+        Toast.makeText(activity, activity.getString(R.string.overlay_permission_required), Toast.LENGTH_SHORT).show();
         request(activity);
         return false;
     }

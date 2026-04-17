@@ -35,14 +35,14 @@
                     style="@style/TextAppearance.App.ScreenTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Block Points" />
+                    android:text="@string/manage_points_title" />
 
                 <TextView
                     style="@style/TextAppearance.App.Body"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_s"
-                    android:text="Adjust the shared touch area, then fine-tune individual points without changing how the page works." />
+                    android:text="@string/manage_points_description" />
             </LinearLayout>
         </android.support.v7.widget.CardView>
 
@@ -77,14 +77,14 @@
                             style="@style/TextAppearance.App.CardTitle"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Global Block Size" />
+                            android:text="@string/global_block_size" />
 
                         <TextView
                             style="@style/TextAppearance.App.Caption"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_xs"
-                            android:text="Any point without an override will use this diameter." />
+                            android:text="@string/global_block_size_description" />
                     </LinearLayout>
 
                     <TextView
@@ -93,7 +93,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_m"
-                        android:text="Global size: 120px" />
+                        android:text="@string/global_size_default" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -131,7 +131,7 @@
             style="@style/TextAppearance.App.SectionEyebrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Saved Points" />
+            android:text="@string/saved_points" />
 
         <TextView
             style="@style/TextAppearance.App.Caption"
@@ -139,7 +139,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_xs"
             android:layout_marginBottom="@dimen/space_m"
-            android:text="Each row keeps its original controls and behavior, but with cleaner spacing and hierarchy." />
+            android:text="@string/saved_points_description" />
 
         <LinearLayout
             android:id="@+id/list_container"
@@ -150,4 +150,3 @@
     </LinearLayout>
 
 </ScrollView>
-

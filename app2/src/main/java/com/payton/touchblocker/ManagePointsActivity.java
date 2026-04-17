@@ -6,7 +6,6 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
@@ -67,7 +66,7 @@ public class ManagePointsActivity extends AppCompatActivity {
     }
 
     private void applyGlobalSize(int sizePx) {
-        tvGlobalSize.setText("Global size: " + sizePx + "px");
+        tvGlobalSize.setText(getString(R.string.global_size_px, sizePx));
         globalPreview.setDiameterPx(sizePx);
     }
 
@@ -83,7 +82,7 @@ public class ManagePointsActivity extends AppCompatActivity {
             final PreviewCircleView preview = row.findViewById(R.id.preview_point);
             View btnDelete = row.findViewById(R.id.btn_delete);
 
-            tvTitle.setText("Point #" + point.getId());
+            tvTitle.setText(getString(R.string.point_title, point.getId()));
             swEnabled.setChecked(point.isEnabled());
 
             int currentSize = point.getSizeOverridePx() > 0 ? point.getSizeOverridePx() : 0;
@@ -140,9 +139,9 @@ public class ManagePointsActivity extends AppCompatActivity {
 
     private void updatePointSizeLabel(TextView tvSize, int size) {
         if (size <= 0) {
-            tvSize.setText("Size: Global");
+            tvSize.setText(getString(R.string.point_size_global));
         } else {
-            tvSize.setText("Size: " + size + "px");
+            tvSize.setText(getString(R.string.point_size_px, size));
         }
     }
 

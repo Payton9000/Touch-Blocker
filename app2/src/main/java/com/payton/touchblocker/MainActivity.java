@@ -1,10 +1,8 @@
 package com.payton.touchblocker;
 
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -13,7 +11,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int OVERLAY_PERMISSION_REQUEST_CODE = 1001;
     private static final String TAG = "MainActivity";
 
     private TextView tvStatus;
@@ -51,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 Log.d(TAG, "Start overlay");
                 startOverlayService(OverlayService.ACTION_START_OVERLAY);
-                tvStatus.setText("Overlay: ON");
+                tvStatus.setText(getString(R.string.overlay_status_on));
             }
         });
 
@@ -60,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 Log.d(TAG, "Stop overlay");
                 startOverlayService(OverlayService.ACTION_STOP_OVERLAY);
-                tvStatus.setText("Overlay: OFF");
+                tvStatus.setText(getString(R.string.overlay_status_off));
             }
         });
 
@@ -133,18 +130,18 @@ public class MainActivity extends AppCompatActivity {
         try {
             Intent shareIntent = LogManager.buildShareIntent(this);
             if (shareIntent == null) {
-                Toast.makeText(this, "No logs yet", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.no_logs_yet), Toast.LENGTH_SHORT).show();
                 return;
             }
-            startActivity(Intent.createChooser(shareIntent, "Export Logs"));
+            startActivity(Intent.createChooser(shareIntent, getString(R.string.export_logs)));
         } catch (Exception e) {
-            Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.export_failed, e.getMessage()), Toast.LENGTH_SHORT).show();
         }
     }
 
     private void updateDebugButton(Button button) {
         boolean enabled = PointStore.isDebugOverlayEnabled(this);
-        button.setText(enabled ? "Debug Overlay: ON" : "Debug Overlay: OFF");
+        button.setText(getString(enabled ? R.string.debug_overlay_on : R.string.debug_overlay_off));
     }
 
     private void notifyDebugChanged(boolean enabled) {

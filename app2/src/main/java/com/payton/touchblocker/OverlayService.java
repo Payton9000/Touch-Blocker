@@ -208,8 +208,8 @@ public class OverlayService extends Service {
         );
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Touch Blocker")
-                .setContentText("Overlay running")
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(getString(R.string.notification_overlay_running))
                 .setSmallIcon(android.R.drawable.ic_menu_view)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
@@ -220,7 +220,7 @@ public class OverlayService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Touch Blocker",
+                    getString(R.string.app_name),
                     NotificationManager.IMPORTANCE_LOW
             );
             NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);

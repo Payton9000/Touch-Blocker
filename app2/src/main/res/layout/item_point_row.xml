@@ -32,7 +32,7 @@
                     style="@style/TextAppearance.App.CardTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Point #1" />
+                    android:text="@string/point_title_default" />
 
                 <TextView
                     android:id="@+id/tv_point_size"
@@ -40,7 +40,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_s"
-                    android:text="Size: Global" />
+                    android:text="@string/point_size_global" />
             </LinearLayout>
 
             <Switch
@@ -48,7 +48,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_m"
-                android:text="Enabled"
+                android:text="@string/point_enabled"
                 android:textColor="@color/textSecondary" />
         </LinearLayout>
 
@@ -57,7 +57,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_m"
-            android:text="Move the slider only if this point needs a different block diameter." />
+            android:text="@string/point_size_description" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -95,6 +95,6 @@
             android:layout_height="wrap_content"
             android:layout_gravity="end"
             android:layout_marginTop="@dimen/space_l"
-            android:text="Delete" />
+            android:text="@string/delete" />
     </LinearLayout>
 </android.support.v7.widget.CardView>

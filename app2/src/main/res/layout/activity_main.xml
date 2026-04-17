@@ -35,14 +35,14 @@
                     style="@style/TextAppearance.App.ScreenTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Touch Blocker" />
+                    android:text="@string/app_name" />
 
                 <TextView
                     style="@style/TextAppearance.App.Body"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_s"
-                    android:text="Manage permissions, overlay behavior, recording tools, and diagnostics from one cleaner control panel." />
+                    android:text="@string/main_subtitle" />
 
                 <TextView
                     android:id="@+id/tv_status"
@@ -50,7 +50,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_l"
-                    android:text="Overlay: OFF" />
+                    android:text="@string/overlay_status_off" />
             </LinearLayout>
         </android.support.v7.widget.CardView>
 
@@ -73,14 +73,14 @@
                     style="@style/TextAppearance.App.CardTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Overlay Controls" />
+                    android:text="@string/overlay_controls_title" />
 
                 <TextView
                     style="@style/TextAppearance.App.Caption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_xs"
-                    android:text="Start with permission, then turn the overlay on or off without leaving the page." />
+                    android:text="@string/overlay_controls_description" />
 
                 <Button
                     android:id="@+id/btn_request_overlay"
@@ -88,7 +88,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_l"
-                    android:text="Request Overlay Permission" />
+                    android:text="@string/request_overlay_permission" />
 
                 <Button
                     android:id="@+id/btn_start_overlay"
@@ -96,7 +96,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_m"
-                    android:text="Start Overlay" />
+                    android:text="@string/start_overlay" />
 
                 <Button
                     android:id="@+id/btn_stop_overlay"
@@ -104,7 +104,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_m"
-                    android:text="Stop Overlay" />
+                    android:text="@string/stop_overlay" />
             </LinearLayout>
         </android.support.v7.widget.CardView>
 
@@ -127,14 +127,14 @@
                     style="@style/TextAppearance.App.CardTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Workspace" />
+                    android:text="@string/workspace_title" />
 
                 <TextView
                     style="@style/TextAppearance.App.Caption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_xs"
-                    android:text="Capture touch points, fine-tune block regions, and validate the result with a quick test." />
+                    android:text="@string/workspace_description" />
 
                 <Button
                     android:id="@+id/btn_start_record"
@@ -142,7 +142,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_l"
-                    android:text="Start Recording" />
+                    android:text="@string/start_recording" />
 
                 <Button
                     android:id="@+id/btn_manage_points"
@@ -150,7 +150,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_m"
-                    android:text="Manage Block Points" />
+                    android:text="@string/manage_block_points" />
 
                 <Button
                     android:id="@+id/btn_test_block"
@@ -158,7 +158,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_m"
-                    android:text="Test Blocking" />
+                    android:text="@string/test_blocking" />
             </LinearLayout>
         </android.support.v7.widget.CardView>
 
@@ -180,14 +180,14 @@
                     style="@style/TextAppearance.App.CardTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Diagnostics" />
+                    android:text="@string/diagnostics_title" />
 
                 <TextView
                     style="@style/TextAppearance.App.Caption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_xs"
-                    android:text="Control the debug overlay and export recorded logs when you need to inspect behavior." />
+                    android:text="@string/diagnostics_description" />
 
                 <Button
                     android:id="@+id/btn_toggle_debug"
@@ -195,7 +195,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_l"
-                    android:text="Debug Overlay: OFF" />
+                    android:text="@string/debug_overlay_off" />
 
                 <Button
                     android:id="@+id/btn_export_logs"
@@ -203,7 +203,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_m"
-                    android:text="Export Logs" />
+                    android:text="@string/export_logs" />
             </LinearLayout>
         </android.support.v7.widget.CardView>
     </LinearLayout>

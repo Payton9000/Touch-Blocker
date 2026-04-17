@@ -26,21 +26,21 @@
             style="@style/TextAppearance.App.OverlayEyebrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Blocking Test" />
+            android:text="@string/blocking_test" />
 
         <TextView
             style="@style/TextAppearance.App.OverlayTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_s"
-            android:text="Tap anywhere to verify coverage." />
+            android:text="@string/blocking_test_prompt" />
 
         <TextView
             style="@style/TextAppearance.App.OverlayCaption"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_xs"
-            android:text="Green means the tap was blocked. Red means it passed through." />
+            android:text="@string/blocking_test_description" />
     </LinearLayout>
 
 </FrameLayout>
