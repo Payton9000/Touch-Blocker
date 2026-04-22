@@ -105,6 +105,59 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_m"
                     android:text="@string/stop_overlay" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_l"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.App.Body"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/auto_start_on_boot_title"
+                            android:textColor="@color/textPrimary"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_boot_restore_summary"
+                            style="@style/TextAppearance.App.Caption"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_xs"
+                            android:text="@string/auto_start_on_boot_summary_disabled" />
+                    </LinearLayout>
+
+                    <android.support.v7.widget.SwitchCompat
+                        android:id="@+id/switch_boot_restore"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_l" />
+                </LinearLayout>
+
+                <TextView
+                    style="@style/TextAppearance.App.Caption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_s"
+                    android:text="@string/auto_start_on_boot_hint" />
+
+                <TextView
+                    android:id="@+id/tv_boot_restore_failure"
+                    style="@style/TextAppearance.App.Caption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_s"
+                    android:textColor="@color/danger"
+                    android:visibility="gone" />
             </LinearLayout>
         </android.support.v7.widget.CardView>
 

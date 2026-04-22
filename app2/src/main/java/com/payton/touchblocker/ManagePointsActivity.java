@@ -146,6 +146,9 @@ public class ManagePointsActivity extends AppCompatActivity {
     }
 
     private void notifyOverlayRefresh() {
+        if (!PointStore.shouldOverlayBeEnabled(this)) {
+            return;
+        }
         Intent intent = new Intent(this, OverlayService.class);
         intent.setAction(OverlayService.ACTION_REFRESH_POINTS);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
