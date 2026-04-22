@@ -1,6 +1,7 @@
 package com.payton.touchblocker;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -11,7 +12,11 @@ public class OverlayPermission {
     public static final int REQUEST_CODE = 1001;
 
     public static boolean canDrawOverlays(Activity activity) {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(activity);
+        return canDrawOverlays((Context) activity);
+    }
+
+    public static boolean canDrawOverlays(Context context) {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context);
     }
 
     public static void request(Activity activity) {

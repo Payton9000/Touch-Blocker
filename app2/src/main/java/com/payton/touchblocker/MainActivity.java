@@ -3,6 +3,7 @@ package com.payton.touchblocker;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.v7.widget.SwitchCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -14,6 +15,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
     private TextView tvStatus;
+    private TextView tvBootRestoreSummary;
+    private TextView tvBootRestoreFailure;
+    private Button btnToggleDebug;
+    private SwitchCompat switchBootRestore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -21,6 +26,9 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         tvStatus = findViewById(R.id.tv_status);
+        tvBootRestoreSummary = findViewById(R.id.tv_boot_restore_summary);
+        tvBootRestoreFailure = findViewById(R.id.tv_boot_restore_failure);
+        switchBootRestore = findViewById(R.id.switch_boot_restore);
 
         Button btnRequestOverlay = findViewById(R.id.btn_request_overlay);
         Button btnStartOverlay = findViewById(R.id.btn_start_overlay);
@@ -29,9 +37,9 @@ public class MainActivity extends AppCompatActivity {
         Button btnManagePoints = findViewById(R.id.btn_manage_points);
         Button btnTestBlock = findViewById(R.id.btn_test_block);
         Button btnExport = findViewById(R.id.btn_export_logs);
-        final Button btnToggleDebug = findViewById(R.id.btn_toggle_debug);
+        btnToggleDebug = findViewById(R.id.btn_toggle_debug);
 
-        updateDebugButton(btnToggleDebug);
+        refreshUiState();
 
         btnRequestOverlay.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -47,8 +55,10 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 Log.d(TAG, "Start overlay");
+                PointStore.setOverlayShouldBeEnabled(MainActivity.this, true);
+                PointStore.clearPendingBootRestoreFailure(MainActivity.this);
                 startOverlayService(OverlayService.ACTION_START_OVERLAY);
-                tvStatus.setText(getString(R.string.overlay_status_on));
+                refreshUiState();
             }
         });
 
@@ -56,8 +66,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 Log.d(TAG, "Stop overlay");
+                PointStore.setOverlayShouldBeEnabled(MainActivity.this, false);
+                PointStore.clearPendingBootRestoreFailure(MainActivity.this);
                 startOverlayService(OverlayService.ACTION_STOP_OVERLAY);
-                tvStatus.setText(getString(R.string.overlay_status_off));
+                refreshUiState();
             }
         });
 
@@ -103,8 +115,19 @@ public class MainActivity extends AppCompatActivity {
                 boolean enabled = !PointStore.isDebugOverlayEnabled(MainActivity.this);
                 PointStore.setDebugOverlayEnabled(MainActivity.this, enabled);
                 Log.d(TAG, "Toggle debug overlay=" + enabled);
-                updateDebugButton(btnToggleDebug);
+                updateDebugButton();
                 notifyDebugChanged(enabled);
+            }
+        });
+
+        switchBootRestore.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean enabled = switchBootRestore.isChecked();
+                PointStore.setBootRestoreEnabled(MainActivity.this, enabled);
+                PointStore.clearPendingBootRestoreFailure(MainActivity.this);
+                updateOverlayStatus();
+                updateBootRestoreSection();
             }
         });
 
@@ -114,6 +137,12 @@ public class MainActivity extends AppCompatActivity {
                 exportLogs();
             }
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshUiState();
     }
 
     private void startOverlayService(String action) {
@@ -139,9 +168,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void updateDebugButton(Button button) {
+    private void updateDebugButton() {
         boolean enabled = PointStore.isDebugOverlayEnabled(this);
-        button.setText(getString(enabled ? R.string.debug_overlay_on : R.string.debug_overlay_off));
+        btnToggleDebug.setText(getString(enabled ? R.string.debug_overlay_on : R.string.debug_overlay_off));
     }
 
     private void notifyDebugChanged(boolean enabled) {
@@ -152,6 +181,50 @@ public class MainActivity extends AppCompatActivity {
             startForegroundService(intent);
         } else {
             startService(intent);
+        }
+    }
+
+    private void refreshUiState() {
+        updateOverlayStatus();
+        updateDebugButton();
+        updateBootRestoreSection();
+    }
+
+    private void updateOverlayStatus() {
+        boolean showOn = PointStore.shouldOverlayBeEnabled(this)
+                && PointStore.getPendingBootRestoreFailure(this) == BootRestoreDecision.FailureReason.NONE;
+        tvStatus.setText(getString(showOn ? R.string.overlay_status_on : R.string.overlay_status_off));
+    }
+
+    private void updateBootRestoreSection() {
+        boolean autoStartEnabled = PointStore.isBootRestoreEnabled(this);
+        boolean overlayShouldBeEnabled = PointStore.shouldOverlayBeEnabled(this);
+        switchBootRestore.setChecked(autoStartEnabled);
+
+        int summaryResId;
+        if (!autoStartEnabled) {
+            summaryResId = R.string.auto_start_on_boot_summary_disabled;
+        } else if (overlayShouldBeEnabled) {
+            summaryResId = R.string.auto_start_on_boot_summary_ready;
+        } else {
+            summaryResId = R.string.auto_start_on_boot_summary_waiting;
+        }
+        tvBootRestoreSummary.setText(getString(summaryResId));
+
+        int failureResId = 0;
+        BootRestoreDecision.FailureReason failureReason = PointStore.getPendingBootRestoreFailure(this);
+        if (failureReason == BootRestoreDecision.FailureReason.MISSING_PERMISSION) {
+            failureResId = R.string.auto_start_on_boot_failure_missing_permission;
+        } else if (failureReason == BootRestoreDecision.FailureReason.NO_ENABLED_POINTS) {
+            failureResId = R.string.auto_start_on_boot_failure_no_points;
+        }
+
+        if (failureResId == 0) {
+            tvBootRestoreFailure.setVisibility(View.GONE);
+            tvBootRestoreFailure.setText("");
+        } else {
+            tvBootRestoreFailure.setVisibility(View.VISIBLE);
+            tvBootRestoreFailure.setText(getString(failureResId));
         }
     }
 }
