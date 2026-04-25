@@ -16,3 +16,4 @@
 /gradle/gradle.properties
 /gradle/buildOutputCleanup/
 /.worktrees/
+/app2/release/
