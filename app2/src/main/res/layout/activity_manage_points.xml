@@ -16,14 +16,13 @@
         android:paddingEnd="@dimen/space_xl"
         android:paddingBottom="@dimen/space_2xl">
 
-        <android.support.v7.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="@dimen/space_l"
             app:cardBackgroundColor="@color/colorSurface"
             app:cardCornerRadius="@dimen/corner_large"
-            app:cardElevation="6dp"
-            app:cardUseCompatPadding="true">
+            app:cardElevation="6dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -31,11 +30,25 @@
                 android:orientation="vertical"
                 android:padding="@dimen/space_xl">
 
-                <TextView
-                    style="@style/TextAppearance.App.ScreenTitle"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/manage_points_title" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/TextAppearance.App.ScreenTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/manage_points_title" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/profile_chip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:visibility="gone" />
+                </LinearLayout>
 
                 <TextView
                     style="@style/TextAppearance.App.Body"
@@ -44,16 +57,15 @@
                     android:layout_marginTop="@dimen/space_s"
                     android:text="@string/manage_points_description" />
             </LinearLayout>
-        </android.support.v7.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
-        <android.support.v7.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="@dimen/space_l"
             app:cardBackgroundColor="@color/colorSurface"
             app:cardCornerRadius="@dimen/corner_large"
-            app:cardElevation="6dp"
-            app:cardUseCompatPadding="true">
+            app:cardElevation="6dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -92,8 +104,7 @@
                         style="@style/Widget.App.InfoChip"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_m"
-                        android:text="@string/global_size_default" />
+                        android:layout_marginStart="@dimen/space_m" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -103,29 +114,29 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <SeekBar
-                        android:id="@+id/sb_global_size"
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/slider_global_size"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:max="600"
-                        android:progress="120" />
+                        android:valueFrom="24"
+                        android:valueTo="200"
+                        android:stepSize="1" />
 
                     <FrameLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
                         android:layout_marginStart="@dimen/space_l"
-                        android:background="@drawable/bg_info_chip"
-                        android:padding="@dimen/space_m">
+                        android:background="@drawable/bg_info_chip">
 
                         <com.payton.touchblocker.PreviewCircleView
                             android:id="@+id/preview_global"
-                            android:layout_width="72dp"
-                            android:layout_height="72dp" />
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent" />
                     </FrameLayout>
                 </LinearLayout>
             </LinearLayout>
-        </android.support.v7.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
             style="@style/TextAppearance.App.SectionEyebrow"
@@ -141,12 +152,18 @@
             android:layout_marginBottom="@dimen/space_m"
             android:text="@string/saved_points_description" />
 
-        <LinearLayout
-            android:id="@+id/list_container"
+        <com.payton.touchblocker.ExpandedRecyclerView
+            android:id="@+id/points_list"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical" />
+            android:nestedScrollingEnabled="false" />
 
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/btn_record_new_point"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginTop="@dimen/space_l"
+            android:text="@string/record_new_point" />
     </LinearLayout>
-
 </ScrollView>

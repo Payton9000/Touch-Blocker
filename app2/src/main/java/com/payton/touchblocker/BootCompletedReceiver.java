@@ -5,13 +5,23 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.util.Log;
+import android.view.Display;
+
+import com.payton.touchblocker.display.AndroidDisplaySnapshotProvider;
+import com.payton.touchblocker.display.DisplayGenerationTracker;
+import com.payton.touchblocker.display.DisplaySnapshot;
+import com.payton.touchblocker.display.DisplaySnapshotProvider;
+import com.payton.touchblocker.display.WindowLayoutInfoObserver;
+import com.payton.touchblocker.profile.ProfileJsonCodec;
+import com.payton.touchblocker.profile.ProfileRepository;
+import com.payton.touchblocker.profile.SharedPreferencesKeyValueStore;
 
 public class BootCompletedReceiver extends BroadcastReceiver {
     private static final String TAG = "BootCompletedReceiver";
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (intent == null || !Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+        if (intent == null || !isRestoreTrigger(intent.getAction())) {
             return;
         }
 
@@ -19,7 +29,7 @@ public class BootCompletedReceiver extends BroadcastReceiver {
                 PointStore.isBootRestoreEnabled(context),
                 PointStore.shouldOverlayBeEnabled(context),
                 OverlayPermission.canDrawOverlays(context),
-                PointStore.hasEnabledPoints(context)
+                hasBlockablePoints(context)
         );
 
         if (decision.shouldStart()) {
@@ -37,6 +47,30 @@ public class BootCompletedReceiver extends BroadcastReceiver {
         } else {
             PointStore.clearPendingBootRestoreFailure(context);
         }
+    }
+
+    static boolean isRestoreTrigger(String action) {
+        return Intent.ACTION_BOOT_COMPLETED.equals(action)
+                || Intent.ACTION_USER_UNLOCKED.equals(action)
+                || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action);
+    }
+
+    private static boolean hasBlockablePoints(Context context) {
+        DisplaySnapshotProvider displaySnapshotProvider = new AndroidDisplaySnapshotProvider(
+                new DisplayGenerationTracker(), new WindowLayoutInfoObserver());
+        DisplaySnapshot snapshot;
+        try {
+            snapshot = displaySnapshotProvider.capture(context, Display.DEFAULT_DISPLAY);
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Unable to capture display snapshot for boot restore check", failure);
+            return false;
+        }
+        ProfileRepository repository = new ProfileRepository(
+                new SharedPreferencesKeyValueStore(PointStore.prefs(context)),
+                new ProfileJsonCodec());
+        return ProfileRestoreCheck.hasBlockablePoints(
+                repository, PointStore.getRawPointsJson(context), PointStore.getGlobalSizePx(context),
+                snapshot);
     }
 
     private void startOverlayService(Context context, String action) {

@@ -11,56 +11,82 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 
+import com.payton.touchblocker.display.IntRect;
+import com.payton.touchblocker.geometry.OverlayClusterPlanner;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class PointOverlayView extends View {
     private static final String TAG = "PointOverlayView";
+    private static final int DEFAULT_OVERLAY_ALPHA = 180;
+    private static final int MAX_BASE_ALPHA = 24;
 
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint basePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint circlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint debugPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint debugTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final List<DebugHit> debugHits = new ArrayList<>();
-    private int overlayAlpha = 180;
-    private int diameterPx = 120;
+    private final List<OverlayClusterPlanner.PlannedCircle> circles = new ArrayList<>();
+    private final List<Shader> circleGradients = new ArrayList<>();
+    private IntRect windowBounds;
+    private int overlayAlpha = DEFAULT_OVERLAY_ALPHA;
     private final int touchSlop;
     private float downX;
     private float downY;
     private boolean movedBeyondSlop;
-    private int pointId;
     private boolean debugEnabled;
     private int debugCounter = 1;
     private ValueAnimator fadeAnimator;
 
     public PointOverlayView(Context context) {
         super(context);
-        paint.setStyle(Paint.Style.FILL);
+        basePaint.setStyle(Paint.Style.FILL);
+        basePaint.setColor(0xFFFF0000);
+        basePaint.setAlpha(MAX_BASE_ALPHA);
+        circlePaint.setStyle(Paint.Style.FILL);
         debugPaint.setStyle(Paint.Style.FILL);
         debugPaint.setColor(0x8800CC00);
         debugTextPaint.setColor(0xFF000000);
         debugTextPaint.setTextSize(20f);
         touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        circlePaint.setAlpha(overlayAlpha);
     }
 
-    public void setDiameterPx(int diameterPx) {
-        this.diameterPx = Math.max(30, diameterPx);
+    /**
+     * Replaces the circles drawn by this window. {@code bounds} is this window's on-screen
+     * position, used to translate each circle's screen-space center into window-local
+     * coordinates. Radial gradient shaders are pre-built here (one per circle, same index as
+     * {@code circles}) so {@link #onDraw} performs zero allocation.
+     */
+    public void setCircles(List<OverlayClusterPlanner.PlannedCircle> newCircles, IntRect bounds) {
+        circles.clear();
+        circles.addAll(newCircles);
+        windowBounds = bounds;
+        circleGradients.clear();
+        for (OverlayClusterPlanner.PlannedCircle circle : circles) {
+            float radius = circle.getDiameterPx() / 2f;
+            float localCx = circle.getCenterX() - windowBounds.getLeft();
+            float localCy = circle.getCenterY() - windowBounds.getTop();
+            circleGradients.add(new RadialGradient(
+                    localCx, localCy, radius, 0xFFFF0000, 0x00FF0000, Shader.TileMode.CLAMP));
+        }
         invalidate();
-    }
-
-    public void setPointId(int pointId) {
-        this.pointId = pointId;
     }
 
     public void setDebugEnabled(boolean enabled) {
+        boolean wasDebugEnabled = debugEnabled;
         debugEnabled = enabled;
         if (enabled) {
             stopFade();
-            overlayAlpha = 255;
+            setOverlayAlphas(255, MAX_BASE_ALPHA);
         } else {
             debugHits.clear();
-            overlayAlpha = 180;
+            setOverlayAlphas(DEFAULT_OVERLAY_ALPHA, MAX_BASE_ALPHA);
+            if (wasDebugEnabled) {
+                startFadeOut();
+            }
         }
-        invalidate();
     }
 
     public void startFadeOut() {
@@ -68,16 +94,22 @@ public class PointOverlayView extends View {
             return;
         }
         stopFade();
-        fadeAnimator = ValueAnimator.ofInt(overlayAlpha, 0);
-        fadeAnimator.setDuration(10_000L);
+        fadeAnimator = ValueAnimator.ofInt(0, (int) OverlayFadePolicy.DURATION_MS);
+        fadeAnimator.setDuration(OverlayFadePolicy.DURATION_MS);
         fadeAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
             public void onAnimationUpdate(ValueAnimator animation) {
-                overlayAlpha = (Integer) animation.getAnimatedValue();
-                invalidate();
+                int elapsedMs = (Integer) animation.getAnimatedValue();
+                setOverlayAlphas(
+                        OverlayFadePolicy.alphaAt(DEFAULT_OVERLAY_ALPHA, elapsedMs),
+                        OverlayFadePolicy.alphaAt(MAX_BASE_ALPHA, elapsedMs));
             }
         });
         fadeAnimator.start();
+    }
+
+    public void dispose() {
+        stopFade();
     }
 
     private void stopFade() {
@@ -90,24 +122,21 @@ public class PointOverlayView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        float radius = diameterPx / 2f;
-        float cx = radius;
-        float cy = radius;
-        int colorCenter = (overlayAlpha << 24) | 0x00FF0000;
-        int colorEdge = (Math.max(0, overlayAlpha - 120) << 24) | 0x00FF0000;
-        RadialGradient gradient = new RadialGradient(
-                cx,
-                cy,
-                radius,
-                colorCenter,
-                colorEdge,
-                Shader.TileMode.CLAMP
-        );
-        paint.setShader(gradient);
-        canvas.drawCircle(cx, cy, radius, paint);
+        canvas.drawRect(0f, 0f, getWidth(), getHeight(), basePaint);
+
+        for (int i = 0; i < circles.size(); i++) {
+            OverlayClusterPlanner.PlannedCircle circle = circles.get(i);
+            float radius = circle.getDiameterPx() / 2f;
+            float localCx = circle.getCenterX() - windowBounds.getLeft();
+            float localCy = circle.getCenterY() - windowBounds.getTop();
+            circlePaint.setShader(circleGradients.get(i));
+            canvas.drawCircle(localCx, localCy, radius, circlePaint);
+            if (debugEnabled) {
+                canvas.drawText("#" + circle.getPointId(), localCx - 6f, localCy - 6f, debugTextPaint);
+            }
+        }
 
         if (debugEnabled) {
-            canvas.drawText("#" + pointId, cx - 6f, cy - 6f, debugTextPaint);
             for (DebugHit hit : debugHits) {
                 canvas.drawCircle(hit.x, hit.y, 8f, debugPaint);
                 canvas.drawText(String.valueOf(hit.index), hit.x + 10f, hit.y - 10f, debugTextPaint);
@@ -136,7 +165,8 @@ public class PointOverlayView extends View {
 
         if (action == MotionEvent.ACTION_UP) {
             if (!movedBeyondSlop) {
-                Log.d(TAG, "blocked tap pointId=" + pointId + " x=" + downX + " y=" + downY);
+                performClick();
+                Log.d(TAG, "blocked tap x=" + downX + " y=" + downY);
                 if (debugEnabled) {
                     debugHits.add(new DebugHit(debugCounter++, event.getX(), event.getY()));
                     trimDebugHits();
@@ -151,6 +181,25 @@ public class PointOverlayView extends View {
         }
 
         return true;
+    }
+
+    @Override
+    public boolean performClick() {
+        super.performClick();
+        return true;
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        dispose();
+        super.onDetachedFromWindow();
+    }
+
+    private void setOverlayAlphas(int alpha, int baseAlpha) {
+        overlayAlpha = Math.max(0, Math.min(255, alpha));
+        circlePaint.setAlpha(overlayAlpha);
+        basePaint.setAlpha(Math.max(0, Math.min(MAX_BASE_ALPHA, baseAlpha)));
+        invalidate();
     }
 
     private void trimDebugHits() {

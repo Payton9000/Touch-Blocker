@@ -3,7 +3,10 @@ package com.payton.touchblocker;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.support.v4.content.FileProvider;
+import androidx.core.content.FileProvider;
+
+import com.payton.touchblocker.geometry.ResolvedPoint;
+import com.payton.touchblocker.profile.ProfilePoint;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -17,16 +20,20 @@ public class LogManager {
     private static final String LOG_DIR = "logs";
     private static final String LOG_FILE_PREFIX = "touch_log_";
 
-    public static void appendPoint(Context context, TouchPoint point) {
+    public static void appendPoint(
+            Context context,
+            String profileId,
+            ProfilePoint point,
+            ResolvedPoint resolvedPoint
+    ) {
         File logFile = getOrCreateLogFile(context);
         if (logFile == null) {
             return;
         }
-        String line = point.getTimestamp() + "," + point.getId() + "," + point.getX() + "," + point.getY() + "," + point.getDurationMs() + "\n";
         BufferedWriter writer = null;
         try {
             writer = new BufferedWriter(new FileWriter(logFile, true));
-            writer.write(line);
+            writer.write(formatPointRow(profileId, point, resolvedPoint));
         } catch (IOException ignored) {
         } finally {
             if (writer != null) {
@@ -36,6 +43,22 @@ public class LogManager {
                 }
             }
         }
+    }
+
+    static String formatPointRow(
+            String profileId,
+            ProfilePoint point,
+            ResolvedPoint resolvedPoint
+    ) {
+        return point.getTimestamp() + ","
+                + profileId + ","
+                + point.getId() + ","
+                + point.getRegionId() + ","
+                + point.getU() + ","
+                + point.getV() + ","
+                + resolvedPoint.getCenterX() + ","
+                + resolvedPoint.getCenterY() + ","
+                + point.getDurationMs() + "\n";
     }
 
     public static Intent buildShareIntent(Context context) {
@@ -63,7 +86,7 @@ public class LogManager {
             try {
                 if (logFile.createNewFile()) {
                     BufferedWriter writer = new BufferedWriter(new FileWriter(logFile, true));
-                    writer.write("timestamp,id,x,y,duration_ms\n");
+                    writer.write("timestamp,profile_id,point_id,region_id,u,v,resolved_x,resolved_y,duration_ms\n");
                     writer.close();
                 }
             } catch (IOException ignored) {

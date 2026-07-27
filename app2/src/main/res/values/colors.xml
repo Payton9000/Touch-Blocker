@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="seed">#6750A4</color>
     <color name="colorPrimary">#2563EB</color>
     <color name="colorPrimaryDark">#1D4ED8</color>
     <color name="colorAccent">#2563EB</color>
@@ -21,4 +22,8 @@
     <color name="overlayPanelBg">#8AFFFFFF</color>
     <color name="overlayLabelText">#516175</color>
     <color name="overlayCaptionText">#314255</color>
+    <color name="preview_outline">#CAC4D0</color>
+    <color name="preview_point">#6750A4</color>
+    <color name="preview_disabled">#B3261E</color>
+    <color name="preview_cutout">#1D1B20</color>
 </resources>

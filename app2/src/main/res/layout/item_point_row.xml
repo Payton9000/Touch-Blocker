@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.v7.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="@dimen/space_l"
     app:cardBackgroundColor="@color/colorSurface"
     app:cardCornerRadius="@dimen/corner_medium"
-    app:cardElevation="4dp"
-    app:cardUseCompatPadding="true">
+    app:cardElevation="4dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -31,25 +30,23 @@
                     android:id="@+id/tv_point_title"
                     style="@style/TextAppearance.App.CardTitle"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/point_title_default" />
+                    android:layout_height="wrap_content" />
 
                 <TextView
-                    android:id="@+id/tv_point_size"
+                    android:id="@+id/tv_disabled_reason"
                     style="@style/Widget.App.InfoChip"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_s"
-                    android:text="@string/point_size_global" />
+                    android:visibility="gone" />
             </LinearLayout>
 
-            <Switch
-                android:id="@+id/sw_enabled"
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_point_enabled"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_m"
-                android:text="@string/point_enabled"
-                android:textColor="@color/textSecondary" />
+                android:text="@string/point_enabled" />
         </LinearLayout>
 
         <TextView
@@ -62,39 +59,58 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_l"
+            android:layout_marginTop="@dimen/space_m"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <SeekBar
-                android:id="@+id/sb_point_size"
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:max="600"
-                android:progress="0" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_point_size"
+                    style="@style/Widget.App.InfoChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/slider_point_size"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_s"
+                    android:valueFrom="0"
+                    android:valueTo="200"
+                    android:stepSize="1" />
+            </LinearLayout>
 
             <FrameLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:layout_marginStart="@dimen/space_l"
-                android:background="@drawable/bg_info_chip"
-                android:padding="@dimen/space_m">
+                android:background="@drawable/bg_info_chip">
 
                 <com.payton.touchblocker.PreviewCircleView
                     android:id="@+id/preview_point"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp" />
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
             </FrameLayout>
         </LinearLayout>
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_delete"
-            style="@style/Widget.App.DangerOutlineButton"
+            style="?attr/materialButtonOutlinedStyle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
-            android:layout_marginTop="@dimen/space_l"
-            android:text="@string/delete" />
+            android:layout_marginTop="@dimen/space_m"
+            android:contentDescription="@string/delete"
+            android:text="@string/delete"
+            android:textColor="@color/danger"
+            app:icon="@android:drawable/ic_menu_delete"
+            app:iconTint="@color/danger"
+            app:strokeColor="@color/danger"
+            app:strokeWidth="1dp" />
     </LinearLayout>
-</android.support.v7.widget.CardView>
+</com.google.android.material.card.MaterialCardView>

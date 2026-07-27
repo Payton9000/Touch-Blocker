@@ -6,9 +6,13 @@ import android.graphics.Paint;
 import android.util.AttributeSet;
 import android.view.View;
 
+import com.payton.touchblocker.profile.ScreenProfile;
+
+/** A density-aware circle sample that always remains inside its view bounds. */
 public class PreviewCircleView extends View {
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private int diameterPx = 120;
+    private final Paint circlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float diameterDp = ScreenProfile.DEFAULT_GLOBAL_DIAMETER_DP;
 
     public PreviewCircleView(Context context) {
         super(context);
@@ -26,23 +30,32 @@ public class PreviewCircleView extends View {
     }
 
     private void init() {
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(0x88FF0000);
+        circlePaint.setStyle(Paint.Style.STROKE);
+        circlePaint.setStrokeWidth(4f);
+        circlePaint.setColor(0x88FF0000);
+        labelPaint.setColor(0xFF5F2120);
+        labelPaint.setTextAlign(Paint.Align.CENTER);
+        labelPaint.setTextSize(getResources().getDisplayMetrics().scaledDensity * 12f);
     }
 
-    public void setDiameterPx(int diameterPx) {
-        this.diameterPx = Math.max(30, diameterPx);
+    public void setDiameterDp(float diameterDp) {
+        this.diameterDp = Math.max(0f, diameterDp);
         invalidate();
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        float radius = diameterPx / 2f;
+        float density = getResources().getDisplayMetrics().density;
+        float requestedRadius = (diameterDp * density) / 2f;
+        float maxRadius = Math.max(0f, Math.min(getWidth(), getHeight()) / 2f
+                - circlePaint.getStrokeWidth() / 2f);
+        float radius = Math.min(requestedRadius, maxRadius);
         float cx = getWidth() / 2f;
         float cy = getHeight() / 2f;
-        canvas.drawCircle(cx, cy, radius, paint);
+        canvas.drawCircle(cx, cy, radius, circlePaint);
+        Paint.FontMetrics metrics = labelPaint.getFontMetrics();
+        float baseline = cy - (metrics.ascent + metrics.descent) / 2f;
+        canvas.drawText(Math.round(diameterDp) + " dp", cx, baseline, labelPaint);
     }
 }
-
