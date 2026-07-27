@@ -9,12 +9,11 @@ import android.view.View;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Draws recording feedback from physical display coordinates. */
 public class TouchRecordView extends View {
-    private static final float DOT_RADIUS = 8f;
-
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final List<TouchPoint> points = new ArrayList<>();
+    private final List<float[]> centersAndRadiiPx = new ArrayList<>();
+    private final int[] locationOnScreen = new int[2];
 
     public TouchRecordView(Context context) {
         super(context);
@@ -34,60 +33,34 @@ public class TouchRecordView extends View {
     private void init() {
         paint.setColor(0xCCFF0000);
         paint.setStyle(Paint.Style.FILL);
-        textPaint.setColor(0xFF000000);
-        textPaint.setTextSize(24f);
     }
 
-    public void addPoint(TouchPoint point) {
-        points.add(point);
-        invalidate();
-    }
-
-    public void setPoints(List<TouchPoint> newPoints) {
-        points.clear();
-        if (newPoints != null) {
-            points.addAll(newPoints);
+    /** Each entry must contain {screenX, screenY, radiusPx}. */
+    public void setResolved(List<float[]> resolvedCentersAndRadiiPx) {
+        centersAndRadiiPx.clear();
+        if (resolvedCentersAndRadiiPx != null) {
+            for (float[] value : resolvedCentersAndRadiiPx) {
+                if (value == null || value.length < 3) {
+                    continue;
+                }
+                centersAndRadiiPx.add(new float[]{value[0], value[1], value[2]});
+            }
         }
         invalidate();
     }
 
-    public Bounds getBounds() {
-        if (points.isEmpty()) {
-            return null;
-        }
-        float minX = Float.MAX_VALUE;
-        float minY = Float.MAX_VALUE;
-        float maxX = 0f;
-        float maxY = 0f;
-        for (TouchPoint point : points) {
-            minX = Math.min(minX, point.getX());
-            minY = Math.min(minY, point.getY());
-            maxX = Math.max(maxX, point.getX());
-            maxY = Math.max(maxY, point.getY());
-        }
-        return new Bounds(minX, minY, maxX, maxY);
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        getLocationOnScreen(locationOnScreen);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        for (TouchPoint point : points) {
-            canvas.drawCircle(point.getX(), point.getY(), DOT_RADIUS, paint);
-            canvas.drawText(String.valueOf(point.getId()), point.getX() + 10f, point.getY() - 10f, textPaint);
-        }
-    }
-
-    public static class Bounds {
-        public final float minX;
-        public final float minY;
-        public final float maxX;
-        public final float maxY;
-
-        public Bounds(float minX, float minY, float maxX, float maxY) {
-            this.minX = minX;
-            this.minY = minY;
-            this.maxX = maxX;
-            this.maxY = maxY;
+        for (float[] value : centersAndRadiiPx) {
+            canvas.drawCircle(value[0] - locationOnScreen[0], value[1] - locationOnScreen[1],
+                    value[2], paint);
         }
     }
 }

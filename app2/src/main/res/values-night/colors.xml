@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="preview_outline">#49454F</color>
+    <color name="preview_point">#D0BCFF</color>
+    <color name="preview_disabled">#F2B8B5</color>
+    <color name="preview_cutout">#000000</color>
+</resources>

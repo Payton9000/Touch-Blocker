@@ -2,36 +2,40 @@ package com.payton.touchblocker;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.DashPathEffect;
 import android.graphics.Paint;
-import android.util.Log;
+import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
-import android.util.AttributeSet;
+
+import com.payton.touchblocker.geometry.OverlayClusterPlanner;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/** Draws and tests the exact rectangular touch windows used by the overlay service. */
 public class TestBlockView extends View {
-    private final Paint areaPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint hitPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint missPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private static final int MAX_HIT_HISTORY = 50;
 
-    private final List<TouchPoint> blockPoints = new ArrayList<>();
+    private final Paint planFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint planStrokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint blockedMarkerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint passedMarkerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final List<OverlayClusterPlanner.WindowPlan> plans = new ArrayList<>();
     private final List<TestHit> hits = new ArrayList<>();
-    private int globalSizePx = 120;
-    private static final String TAG = "TestBlockView";
+    private final int[] windowLocation = new int[2];
+
     private int touchSlop;
     private float downX;
     private float downY;
-    private boolean trackingBlocked;
     private boolean movedBeyondSlop;
-
-    private boolean debugOverlayEnabled;
-    private final int[] windowLocation = new int[2];
     private int windowOffsetX;
     private int windowOffsetY;
+    private int blockedCount;
+    private int passedCount;
+    private OnStatsChangedListener onStatsChangedListener;
 
     public TestBlockView(Context context) {
         super(context);
@@ -49,65 +53,80 @@ public class TestBlockView extends View {
     }
 
     private void init(Context context) {
-        areaPaint.setStyle(Paint.Style.STROKE);
-        areaPaint.setStrokeWidth(4f);
-        areaPaint.setColor(0x88FF0000);
-        hitPaint.setStyle(Paint.Style.FILL);
-        hitPaint.setColor(0x8800CC00);
-        missPaint.setStyle(Paint.Style.FILL);
-        missPaint.setColor(0x88FF0000);
-        textPaint.setTextSize(24f);
-        textPaint.setColor(0xFF000000);
+        float density = context.getResources().getDisplayMetrics().density;
+        int primary = resolveThemeColor(context, com.google.android.material.R.attr.colorPrimary);
+        int error = resolveThemeColor(context, com.google.android.material.R.attr.colorError);
+
+        planFillPaint.setStyle(Paint.Style.FILL);
+        planFillPaint.setColor(withAlpha(primary, 41));
+        planStrokePaint.setStyle(Paint.Style.STROKE);
+        planStrokePaint.setStrokeWidth(2f * density);
+        planStrokePaint.setColor(primary);
+        planStrokePaint.setPathEffect(new DashPathEffect(
+                new float[]{6f * density, 4f * density}, 0f));
+        blockedMarkerPaint.setStyle(Paint.Style.STROKE);
+        blockedMarkerPaint.setStrokeCap(Paint.Cap.ROUND);
+        blockedMarkerPaint.setStrokeWidth(3f * density);
+        blockedMarkerPaint.setColor(0xFF2E7D32);
+        passedMarkerPaint.setStyle(Paint.Style.STROKE);
+        passedMarkerPaint.setStrokeCap(Paint.Cap.ROUND);
+        passedMarkerPaint.setStrokeWidth(3f * density);
+        passedMarkerPaint.setColor(error);
         touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
     }
 
-    public void setBlockPoints(List<TouchPoint> points) {
-        blockPoints.clear();
-        if (points != null) {
-            blockPoints.addAll(points);
+    public void setPlans(List<OverlayClusterPlanner.WindowPlan> newPlans) {
+        plans.clear();
+        if (newPlans != null) {
+            plans.addAll(newPlans);
         }
         invalidate();
     }
 
-    public void setGlobalSizePx(int sizePx) {
-        globalSizePx = Math.max(30, sizePx);
+    public void setOnStatsChangedListener(OnStatsChangedListener listener) {
+        onStatsChangedListener = listener;
+        notifyStatsChanged();
+    }
+
+    public void clearResults() {
+        hits.clear();
+        blockedCount = 0;
+        passedCount = 0;
+        notifyStatsChanged();
         invalidate();
     }
 
-    public void setDebugOverlayEnabled(boolean enabled) {
-        if (debugOverlayEnabled != enabled) {
-            debugOverlayEnabled = enabled;
-            invalidate();
+    static boolean isBlockedByPlans(
+            List<OverlayClusterPlanner.WindowPlan> plans,
+            float screenX,
+            float screenY
+    ) {
+        for (OverlayClusterPlanner.WindowPlan plan : plans) {
+            com.payton.touchblocker.display.IntRect bounds = plan.getBounds();
+            if (bounds.getLeft() <= screenX && screenX < bounds.getRight()
+                    && bounds.getTop() <= screenY && screenY < bounds.getBottom()) {
+                return true;
+            }
         }
-    }
-
-    public boolean isDebugOverlayEnabled() {
-        return debugOverlayEnabled;
+        return false;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         updateWindowOffset();
-        if (debugOverlayEnabled) {
-            for (TouchPoint point : blockPoints) {
-                if (!point.isEnabled()) {
-                    continue;
-                }
-                int size = point.getSizeOverridePx() > 0 ? point.getSizeOverridePx() : globalSizePx;
-                float radius = size / 2f;
-                float px = toLocalX(PointStore.resolveX(getContext(), point));
-                float py = toLocalY(PointStore.resolveY(getContext(), point));
-                canvas.drawCircle(px, py, radius, areaPaint);
-            }
+        float cornerRadius = 12f * getResources().getDisplayMetrics().density;
+        for (OverlayClusterPlanner.WindowPlan plan : plans) {
+            com.payton.touchblocker.display.IntRect bounds = plan.getBounds();
+            float left = toLocalX(bounds.getLeft());
+            float top = toLocalY(bounds.getTop());
+            float right = toLocalX(bounds.getRight());
+            float bottom = toLocalY(bounds.getBottom());
+            canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius, planFillPaint);
+            canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius, planStrokePaint);
         }
         for (TestHit hit : hits) {
-            Paint paint = hit.blocked ? hitPaint : missPaint;
-            TouchPoint resolved = hit.toTouchPoint();
-            float lx = toLocalX(PointStore.resolveX(getContext(), resolved));
-            float ly = toLocalY(PointStore.resolveY(getContext(), resolved));
-            canvas.drawCircle(lx, ly, 10f, paint);
-            canvas.drawText(String.valueOf(hit.index), lx + 12f, ly - 12f, textPaint);
+            drawHitMarker(canvas, hit);
         }
     }
 
@@ -115,55 +134,65 @@ public class TestBlockView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
-            downX = event.getRawX();
-            downY = event.getRawY();
+            downX = event.getX();
+            downY = event.getY();
             movedBeyondSlop = false;
             return true;
         }
-
         if (action == MotionEvent.ACTION_MOVE) {
-            float dx = Math.abs(event.getRawX() - downX);
-            float dy = Math.abs(event.getRawY() - downY);
-            if (dx > touchSlop || dy > touchSlop) {
+            if (Math.abs(event.getX() - downX) > touchSlop
+                    || Math.abs(event.getY() - downY) > touchSlop) {
                 movedBeyondSlop = true;
             }
             return true;
         }
-
         if (action == MotionEvent.ACTION_UP) {
             if (!movedBeyondSlop) {
-                boolean blocked = isBlocked(downX, downY);
-                TestHit hit = buildHit(downX, downY, blocked);
-                hits.add(hit);
-                Log.d(TAG, "tap x=" + downX + " y=" + downY + " blocked=" + blocked);
-                invalidate();
+                updateWindowOffset();
+                float screenX = toScreenX(downX);
+                float screenY = toScreenY(downY);
+                boolean blocked = isBlockedByPlans(plans, screenX, screenY);
+                performClick();
+                announceForAccessibility(getContext().getString(
+                        blocked ? R.string.a11y_blocked : R.string.a11y_passed));
+                addHit(screenX, screenY, blocked);
             }
             return true;
         }
-
-        if (action == MotionEvent.ACTION_CANCEL) {
-            return true;
-        }
-
         return true;
     }
 
-    private boolean isBlocked(float x, float y) {
-        for (TouchPoint point : blockPoints) {
-            if (!point.isEnabled()) {
-                continue;
-            }
-            int size = point.getSizeOverridePx() > 0 ? point.getSizeOverridePx() : globalSizePx;
-            float radius = size / 2f;
-            float px = PointStore.resolveX(getContext(), point);
-            float py = PointStore.resolveY(getContext(), point);
-            float dx = x - px;
-            float dy = y - py;
-            if ((dx * dx + dy * dy) <= radius * radius) {
-                return true;
-            }
+    @Override
+    public boolean performClick() {
+        super.performClick();
+        return true;
+    }
+
+    private void addHit(float screenX, float screenY, boolean blocked) {
+        if (hits.size() == MAX_HIT_HISTORY) {
+            hits.remove(0);
         }
-        return false;
+        hits.add(new TestHit(screenX, screenY, blocked));
+        if (blocked) {
+            blockedCount++;
+        } else {
+            passedCount++;
+        }
+        notifyStatsChanged();
+        invalidate();
+    }
+
+    private void drawHitMarker(Canvas canvas, TestHit hit) {
+        float x = toLocalX(hit.screenX);
+        float y = toLocalY(hit.screenY);
+        float radius = 8f * getResources().getDisplayMetrics().density;
+        if (hit.blocked) {
+            canvas.drawLine(x - radius, y, x - radius / 4f, y + radius, blockedMarkerPaint);
+            canvas.drawLine(x - radius / 4f, y + radius, x + radius, y - radius, blockedMarkerPaint);
+        } else {
+            canvas.drawLine(x - radius, y - radius, x + radius, y + radius, passedMarkerPaint);
+            canvas.drawLine(x + radius, y - radius, x - radius, y + radius, passedMarkerPaint);
+        }
     }
 
     private void updateWindowOffset() {
@@ -180,51 +209,45 @@ public class TestBlockView extends View {
         return screenY - windowOffsetY;
     }
 
-    private TestHit buildHit(float x, float y, boolean blocked) {
-        android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
-        android.view.WindowManager wm = (android.view.WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE);
-        if (wm != null) {
-            wm.getDefaultDisplay().getRealMetrics(metrics);
-        }
-        float nx = metrics.widthPixels > 0 ? x / metrics.widthPixels : -1f;
-        float ny = metrics.heightPixels > 0 ? y / metrics.heightPixels : -1f;
-        int rotation = wm != null ? wm.getDefaultDisplay().getRotation() : android.view.Surface.ROTATION_0;
-        return new TestHit(hits.size() + 1, x, y, blocked, nx, ny, rotation, metrics.widthPixels, metrics.heightPixels);
+    private float toScreenX(float localX) {
+        return localX + windowOffsetX;
     }
 
-    private static class TestHit {
-        private final int index;
-        private final float x;
-        private final float y;
-        private final boolean blocked;
-        private final float normalizedX;
-        private final float normalizedY;
-        private final int baseRotation;
-        private final int baseWidthPx;
-        private final int baseHeightPx;
+    private float toScreenY(float localY) {
+        return localY + windowOffsetY;
+    }
 
-        private TestHit(int index, float x, float y, boolean blocked,
-                        float normalizedX, float normalizedY,
-                        int baseRotation, int baseWidthPx, int baseHeightPx) {
-            this.index = index;
-            this.x = x;
-            this.y = y;
-            this.blocked = blocked;
-            this.normalizedX = normalizedX;
-            this.normalizedY = normalizedY;
-            this.baseRotation = baseRotation;
-            this.baseWidthPx = baseWidthPx;
-            this.baseHeightPx = baseHeightPx;
+    private void notifyStatsChanged() {
+        if (onStatsChangedListener != null) {
+            onStatsChangedListener.onStatsChanged(blockedCount, passedCount);
         }
+    }
 
-        private TouchPoint toTouchPoint() {
-            TouchPoint point = new TouchPoint(-1, x, y, 0L, 0L);
-            point.setNormalizedX(normalizedX);
-            point.setNormalizedY(normalizedY);
-            point.setBaseRotation(baseRotation);
-            point.setBaseWidthPx(baseWidthPx);
-            point.setBaseHeightPx(baseHeightPx);
-            return point;
+    private static int resolveThemeColor(Context context, int attribute) {
+        TypedValue value = new TypedValue();
+        if (!context.getTheme().resolveAttribute(attribute, value, true)) {
+            return 0;
+        }
+        return value.data;
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | (alpha << 24);
+    }
+
+    public interface OnStatsChangedListener {
+        void onStatsChanged(int blocked, int passed);
+    }
+
+    private static final class TestHit {
+        private final float screenX;
+        private final float screenY;
+        private final boolean blocked;
+
+        private TestHit(float screenX, float screenY, boolean blocked) {
+            this.screenX = screenX;
+            this.screenY = screenY;
+            this.blocked = blocked;
         }
     }
 }
