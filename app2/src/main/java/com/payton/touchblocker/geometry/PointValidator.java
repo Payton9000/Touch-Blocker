@@ -7,6 +7,12 @@ import com.payton.touchblocker.profile.PointDisabledReason;
 import com.payton.touchblocker.profile.ProfilePoint;
 
 public final class PointValidator {
+    /**
+     * Diameter used only to re-resolve a rejected point's centre when classifying why it was
+     * rejected. The centre does not depend on the diameter, so any positive value works.
+     */
+    private static final float DEFAULT_PROBE_DIAMETER_DP = 1f;
+
     private PointValidator() {
     }
 
@@ -22,6 +28,24 @@ public final class PointValidator {
                 || snapshot.getWidthPx() <= 0
                 || snapshot.getHeightPx() <= 0) {
             return invalid(PointDisabledReason.INVALID_DATA);
+        }
+        if (point.hasNaturalAnchor() && resolved == null) {
+            // resolve() returns null both for "outside every region" and for "inside a cutout or
+            // on the hinge". Re-resolve without the safety check so the real reason survives:
+            // recording it as CUTOUT/HINGE is what lets ProfileRevalidator switch the point back
+            // on once the display geometry moves it somewhere usable again. Reporting
+            // OUT_OF_BOUNDS here disabled such points permanently.
+            float diameterDp = point.getDiameterDpOverride() > 0f
+                    ? point.getDiameterDpOverride()
+                    : DEFAULT_PROBE_DIAMETER_DP;
+            ResolvedPoint unchecked = CoordinateTransformer.resolveIgnoringUnsafeAreas(
+                    snapshot, point, diameterDp);
+            if (unchecked == null) {
+                return invalid(PointDisabledReason.OUT_OF_BOUNDS);
+            }
+            PointDisabledReason reason = CoordinateTransformer.rejectionReasonAt(
+                    snapshot, unchecked.getCenterX(), unchecked.getCenterY());
+            return invalid(reason == null ? PointDisabledReason.OUT_OF_BOUNDS : reason);
         }
         DisplayRegion selectedRegion = point.hasNaturalAnchor()
                 ? findContainingRegion(snapshot, resolved)

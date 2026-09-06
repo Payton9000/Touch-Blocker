@@ -10,8 +10,11 @@ import com.payton.touchblocker.TestFixtures;
 import com.payton.touchblocker.display.DisplayRegion;
 import com.payton.touchblocker.display.DisplaySnapshot;
 import com.payton.touchblocker.display.IntRect;
+import com.payton.touchblocker.display.UnsafeArea;
 
 import org.junit.Test;
+
+import java.util.Collections;
 
 public class ProfileRevalidatorTest {
     @Test
@@ -102,6 +105,42 @@ public class ProfileRevalidatorTest {
         assertTrue(updated.getPoints().get(0).isEnabled());
         assertEquals(PointDisabledReason.NONE,
                 updated.getPoints().get(0).getDisabledReason());
+    }
+
+    /**
+     * The full round trip that used to lose blockers permanently: a rotation pushes an anchored
+     * point under the camera hole, and rotating back must switch it on again.
+     *
+     * <p>This works only because validation now reports {@code CUTOUT} rather than
+     * {@code OUT_OF_BOUNDS} -- the re-enable branch in {@code revalidate} is reached only for
+     * {@code CUTOUT}/{@code HINGE}, so with the wrong reason the point stayed off for good.
+     */
+    @Test
+    public void pointDisabledByACutoutIsReEnabledOnceTheCutoutNoLongerCoversIt() {
+        ProfilePoint anchored = ProfilePoint.enabledWithNaturalAnchor(
+                1, "full", 0.25f, 0.10f, 0.25f, 0.10f, 0L, 0L, 1L);
+        ScreenProfile profile = TestFixtures.profileWithPoint(anchored);
+        DisplaySnapshot covered = new DisplaySnapshot(
+                "display", 0, 1000, 1800, 0, 1f, 1L, null,
+                Collections.singletonList(
+                        new DisplayRegion("full", new IntRect(0, 0, 1000, 1800))),
+                Collections.singletonList(new UnsafeArea(
+                        new IntRect(200, 130, 300, 230), PointDisabledReason.CUTOUT)));
+
+        ScreenProfile disabled = new ProfileRevalidator().revalidate(profile, covered);
+        assertFalse(disabled.getPoints().get(0).isEnabled());
+        assertEquals(
+                "must record CUTOUT so the recovery branch can find it",
+                PointDisabledReason.CUTOUT, disabled.getPoints().get(0).getDisabledReason());
+
+        ScreenProfile recovered = new ProfileRevalidator().revalidate(
+                disabled, TestFixtures.singleRegion(1000, 1800));
+
+        assertTrue(
+                "the blocker must come back once the cutout no longer covers it",
+                recovered.getPoints().get(0).isEnabled());
+        assertEquals(PointDisabledReason.NONE,
+                recovered.getPoints().get(0).getDisabledReason());
     }
 
     @Test

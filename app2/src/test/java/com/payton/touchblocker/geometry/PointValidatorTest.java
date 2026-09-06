@@ -161,6 +161,83 @@ public class PointValidatorTest {
         assertInvalid(result, PointDisabledReason.INVALID_DATA);
     }
 
+    /**
+     * A natural-anchor point that a rotation moved under the camera hole must be reported as
+     * {@code CUTOUT}, not {@code OUT_OF_BOUNDS}. {@code ProfileRevalidator} only re-enables points
+     * disabled for {@code CUTOUT}/{@code HINGE}, so reporting the wrong reason disabled the point
+     * forever: it never came back when the user rotated away again.
+     */
+    @Test
+    public void anchoredPointInsideACutoutReportsCutoutSoItCanRecover() {
+        DisplaySnapshot snapshot = new DisplaySnapshot(
+                "cutout-display", 0, 1000, 2000, 0, 1f, 1L, null,
+                Collections.singletonList(
+                        new DisplayRegion("full", new IntRect(0, 0, 1000, 2000))),
+                Collections.singletonList(new UnsafeArea(
+                        new IntRect(200, 150, 300, 250), PointDisabledReason.CUTOUT)));
+        ProfilePoint point = ProfilePoint.enabledWithNaturalAnchor(
+                1, "full", 0.25f, 0.10f, 0.25f, 0.10f, 0L, 0L, 1L);
+
+        // resolve() rejects it, losing the reason; validate() must recover the reason itself.
+        assertEquals(null, CoordinateTransformer.resolve(snapshot, point, 30f));
+        PointValidation result = PointValidator.validate(
+                snapshot, point, CoordinateTransformer.resolve(snapshot, point, 30f));
+
+        assertInvalid(result, PointDisabledReason.CUTOUT);
+    }
+
+    @Test
+    public void anchoredPointOnTheHingeReportsHingeSoItCanRecover() {
+        DisplaySnapshot snapshot = new DisplaySnapshot(
+                "fold-display", 0, 1000, 2000, 0, 1f, 1L, null,
+                Collections.singletonList(
+                        new DisplayRegion("full", new IntRect(0, 0, 1000, 2000))),
+                Collections.singletonList(new UnsafeArea(
+                        new IntRect(200, 150, 300, 250), PointDisabledReason.HINGE)));
+        ProfilePoint point = ProfilePoint.enabledWithNaturalAnchor(
+                1, "full", 0.25f, 0.10f, 0.25f, 0.10f, 0L, 0L, 1L);
+
+        PointValidation result = PointValidator.validate(
+                snapshot, point, CoordinateTransformer.resolve(snapshot, point, 30f));
+
+        assertInvalid(result, PointDisabledReason.HINGE);
+    }
+
+    /** Genuinely off-display anchors stay OUT_OF_BOUNDS; only unsafe areas get their own reason. */
+    @Test
+    public void anchoredPointOutsideEveryRegionIsStillOutOfBounds() {
+        DisplaySnapshot snapshot = new DisplaySnapshot(
+                "inset-display", 0, 1000, 2000, 0, 1f, 1L, null,
+                Collections.singletonList(
+                        new DisplayRegion("safe", new IntRect(0, 500, 1000, 1500))),
+                Collections.<UnsafeArea>emptyList());
+        ProfilePoint point = ProfilePoint.enabledWithNaturalAnchor(
+                1, "safe", 0.25f, 0.05f, 0.25f, 0.05f, 0L, 0L, 1L);
+
+        PointValidation result = PointValidator.validate(
+                snapshot, point, CoordinateTransformer.resolve(snapshot, point, 30f));
+
+        assertInvalid(result, PointDisabledReason.OUT_OF_BOUNDS);
+    }
+
+    @Test
+    public void rejectionReasonAtDistinguishesUnsafeAreasFromOffDisplay() {
+        DisplaySnapshot snapshot = new DisplaySnapshot(
+                "display", 0, 1000, 2000, 0, 1f, 1L, null,
+                Collections.singletonList(
+                        new DisplayRegion("full", new IntRect(0, 0, 1000, 2000))),
+                Collections.singletonList(new UnsafeArea(
+                        new IntRect(400, 0, 600, 100), PointDisabledReason.CUTOUT)));
+
+        assertEquals(
+                PointDisabledReason.CUTOUT,
+                CoordinateTransformer.rejectionReasonAt(snapshot, 500f, 50f));
+        assertEquals(
+                PointDisabledReason.OUT_OF_BOUNDS,
+                CoordinateTransformer.rejectionReasonAt(snapshot, 500f, 3000f));
+        assertEquals(null, CoordinateTransformer.rejectionReasonAt(snapshot, 500f, 900f));
+    }
+
     private static ProfilePoint enabledPoint(String regionId, float u, float v) {
         return ProfilePoint.enabled(1, regionId, u, v, 0L, 0L, 1L);
     }
