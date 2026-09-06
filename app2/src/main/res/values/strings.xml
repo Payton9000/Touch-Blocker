@@ -65,6 +65,8 @@
     <string name="delete">Delete</string>
     <string name="record_new_point">Record new point</string>
     <string name="reason_out_of_bounds">Outside this screen</string>
+    <string name="reason_cutout">Under the camera cutout right now; returns when the screen turns</string>
+    <string name="reason_hinge">On the fold right now; returns when the device is unfolded</string>
     <string name="reason_invalid_data">Invalid data</string>
     <string name="reason_needs_review">Disabled by you</string>
     <string name="overlay_permission_required">Please grant overlay permission</string>

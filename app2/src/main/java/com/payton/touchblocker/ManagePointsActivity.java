@@ -390,9 +390,17 @@ public class ManagePointsActivity extends AppCompatActivity {
         if (reason == PointDisabledReason.NEEDS_REVIEW) {
             return R.string.reason_needs_review;
         }
-        if (reason == PointDisabledReason.OUT_OF_BOUNDS
-                || reason == PointDisabledReason.CUTOUT
-                || reason == PointDisabledReason.HINGE) {
+        // CUTOUT and HINGE are recoverable: the point comes back by itself once the display
+        // geometry stops covering it (rotate away from the camera hole, unfold the device). Showing
+        // the same "outside this screen" text as a genuinely off-display point told the user to
+        // re-record something that would have fixed itself.
+        if (reason == PointDisabledReason.CUTOUT) {
+            return R.string.reason_cutout;
+        }
+        if (reason == PointDisabledReason.HINGE) {
+            return R.string.reason_hinge;
+        }
+        if (reason == PointDisabledReason.OUT_OF_BOUNDS) {
             return R.string.reason_out_of_bounds;
         }
         return 0;

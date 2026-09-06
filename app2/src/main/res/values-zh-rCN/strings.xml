@@ -61,6 +61,8 @@
     <string name="delete">删除</string>
     <string name="record_new_point">录制新点位</string>
     <string name="reason_out_of_bounds">超出当前屏幕范围</string>
+    <string name="reason_cutout">当前被挖孔遮挡，屏幕转向后会自动恢复</string>
+    <string name="reason_hinge">当前位于折叠铰链上，展开后会自动恢复</string>
     <string name="reason_invalid_data">数据无效</string>
     <string name="reason_needs_review">已手动停用</string>
     <string name="overlay_permission_required">请先授予悬浮窗权限</string>
