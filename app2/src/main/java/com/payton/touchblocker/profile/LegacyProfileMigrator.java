@@ -97,6 +97,10 @@ public final class LegacyProfileMigrator {
             float overrideDp = legacy.getSizeOverridePx() <= 0
                     ? 0f
                     : pixelsToDp(legacy.getSizeOverridePx(), snapshot.getDensity());
+            // A blocking point marks a physically fixed spot on the glass, so it must be stored as
+            // a rotation-independent natural anchor. Storing only u/v made CoordinateTransformer
+            // stretch the fraction across the rotated bounds rather than rotating it, which moved
+            // every migrated point to a different physical spot on each turn.
             ProfilePoint point = new ProfilePoint(
                     legacy.getId(),
                     region.getId(),
@@ -107,7 +111,9 @@ public final class LegacyProfileMigrator {
                     PointDisabledReason.NONE,
                     legacy.getTimestamp(),
                     legacy.getDurationMs(),
-                    snapshot.getGeneration()
+                    snapshot.getGeneration(),
+                    position.naturalU,
+                    position.naturalV
             );
 
             PointDisabledReason disabledReason = PointDisabledReason.NONE;
@@ -186,6 +192,13 @@ public final class LegacyProfileMigrator {
             if (currentRotation < 0) {
                 return null;
             }
+            // The legacy record stores its own rotation and frame size, so unrotating with those
+            // (above) already yields the physical spot in natural space. Scaling that spot into the
+            // CURRENT natural frame and re-rotating it is correct; the subtle part is that both
+            // natural dimensions must come from the same space. Deriving them from the snapshot's
+            // rotated width/height is what made the result depend on the rotation the device
+            // happened to be in during the upgrade -- installing while rotated 180 degrees left
+            // every point mirrored.
             int currentNaturalWidth = isQuarterTurn(currentRotation)
                     ? snapshot.getHeightPx() : snapshot.getWidthPx();
             int currentNaturalHeight = isQuarterTurn(currentRotation)
@@ -197,10 +210,15 @@ public final class LegacyProfileMigrator {
             float[] rotated = rotateFromNatural(
                     naturalX, naturalY, currentRotation,
                     currentNaturalWidth, currentNaturalHeight);
+            // The stored anchor comes from natural space, which is rotation-independent by
+            // construction, so the migrated point lands on the same physical spot no matter which
+            // way the device was held during the upgrade.
             return new MigratedPosition(
                     snapshot.getBounds().getLeft() + rotated[0],
                     snapshot.getBounds().getTop() + rotated[1],
-                    true
+                    true,
+                    clampUnit(naturalX / currentNaturalWidth),
+                    clampUnit(naturalY / currentNaturalHeight)
             );
         }
 
@@ -217,7 +235,14 @@ public final class LegacyProfileMigrator {
         } else {
             return null;
         }
-        return new MigratedPosition(x, y, false);
+        // No recorded rotation, so the physical spot cannot be recovered exactly. Anchor to the
+        // current rotation anyway: the point is flagged NEEDS_REVIEW for the user to confirm, and
+        // an anchor at least keeps it still from this point on instead of drifting on every turn.
+        float[] anchor = naturalAnchorFor(snapshot, x, y);
+        if (anchor == null) {
+            return new MigratedPosition(x, y, false);
+        }
+        return new MigratedPosition(x, y, false, anchor[0], anchor[1]);
     }
 
     private static DisplayRegion findContainingRegion(
@@ -311,6 +336,26 @@ public final class LegacyProfileMigrator {
         return rotation == 1 || rotation == 3;
     }
 
+    /**
+     * Converts a screen position into the display's rotation-independent natural fractions, or
+     * {@code null} when the snapshot geometry is unusable.
+     */
+    private static float[] naturalAnchorFor(DisplaySnapshot snapshot, float x, float y) {
+        int rotation = normalizedRotation(snapshot.getRotation());
+        IntRect bounds = snapshot.getBounds();
+        if (rotation < 0 || bounds.width() <= 0 || bounds.height() <= 0) {
+            return null;
+        }
+        int naturalWidth = isQuarterTurn(rotation) ? bounds.height() : bounds.width();
+        int naturalHeight = isQuarterTurn(rotation) ? bounds.width() : bounds.height();
+        float[] natural = unrotateToNatural(
+                x - bounds.getLeft(), y - bounds.getTop(), rotation,
+                naturalWidth, naturalHeight);
+        return new float[]{
+                clampUnit(natural[0] / naturalWidth),
+                clampUnit(natural[1] / naturalHeight)};
+    }
+
     private static float[] rotateFromNatural(
             float x,
             float y,
@@ -349,15 +394,38 @@ public final class LegacyProfileMigrator {
         return new float[]{x, y};
     }
 
+    /**
+     * A migrated point's position. {@code x}/{@code y} are screen coordinates in the snapshot's
+     * current rotation, used for region assignment and validation. {@code naturalU}/{@code naturalV}
+     * are the rotation-independent fractions that get stored, and are what keep the point on the
+     * same physical spot when the screen turns.
+     */
     private static final class MigratedPosition {
         private final float x;
         private final float y;
         private final boolean hasReliableBaseGeometry;
+        private final float naturalU;
+        private final float naturalV;
 
-        private MigratedPosition(float x, float y, boolean hasReliableBaseGeometry) {
+        private MigratedPosition(
+                float x,
+                float y,
+                boolean hasReliableBaseGeometry,
+                float naturalU,
+                float naturalV) {
             this.x = x;
             this.y = y;
             this.hasReliableBaseGeometry = hasReliableBaseGeometry;
+            this.naturalU = naturalU;
+            this.naturalV = naturalV;
+        }
+
+        private MigratedPosition(float x, float y, boolean hasReliableBaseGeometry) {
+            this(x, y, hasReliableBaseGeometry, -1f, -1f);
+        }
+
+        private boolean hasNaturalAnchor() {
+            return isUnit(naturalU) && isUnit(naturalV);
         }
     }
 

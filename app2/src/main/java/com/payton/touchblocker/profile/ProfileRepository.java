@@ -146,6 +146,46 @@ public final class ProfileRepository {
         }
     }
 
+    /**
+     * Rebuilds the profile document from the pre-migration records kept under
+     * {@link #KEY_LEGACY_BACKUP}, replacing whatever the first v2 migration produced.
+     *
+     * <p>Used only by {@link LegacyRemigration} to repair points that the original migration stored
+     * without a natural anchor, which made them move to a different physical spot on every screen
+     * rotation. The current backup is preserved as {@link #KEY_BACKUP} first, so a bad repair is
+     * still recoverable.
+     *
+     * @return {@code true} when a repaired document was committed.
+     */
+    public boolean remigrateFromLegacyBackup(
+            String legacyJson,
+            int legacyGlobalPx,
+            DisplaySnapshot snapshot
+    ) {
+        synchronized (PROCESS_LOCK) {
+            if (legacyJson == null || snapshot == null) {
+                return false;
+            }
+            final List<LegacyPointRecord> legacyPoints;
+            try {
+                legacyPoints = parseLegacyPoints(legacyJson);
+            } catch (Exception failure) {
+                return false;
+            }
+            if (legacyPoints.isEmpty()) {
+                return false;
+            }
+            ProfileKind kind = snapshot.getSuggestedKind() == null
+                    ? ProfileKind.OUTER : snapshot.getSuggestedKind();
+            LegacyProfileMigrator.MigrationResult migration = migrator.migrate(
+                    legacyPoints, legacyGlobalPx, snapshot, kind);
+            if (!migration.isSuccess()) {
+                return false;
+            }
+            return save(migration.getDocument());
+        }
+    }
+
     private LoadResult loadLocked() {
         if (cachedDocument != null) {
             return LoadResult.success(cachedDocument, cachedFromBackup);
