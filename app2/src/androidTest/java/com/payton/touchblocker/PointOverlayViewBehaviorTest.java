@@ -178,6 +178,116 @@ public class PointOverlayViewBehaviorTest {
         assertTrue(animatorReference.get().isStarted());
     }
 
+    /**
+     * The v2.0 rotation regression: a geometry refresh re-applies the current debug mode to
+     * every window it reuses, so {@code setDebugEnabled(false)} on an already-non-debug window
+     * must not reset the alpha or restart the fade. Before the fix this reset the circles to
+     * {@code DEFAULT_OVERLAY_ALPHA} and left them permanently red after every rotation.
+     */
+    @Test
+    public void reapplyingTheSameNonDebugModeKeepsAFinishedFadeInvisible() throws Exception {
+        Field fadeAnimatorField = PointOverlayView.class.getDeclaredField("fadeAnimator");
+        fadeAnimatorField.setAccessible(true);
+        AtomicReference<Bitmap> bitmapReference = new AtomicReference<>();
+
+        runOnMainSync(() -> {
+            PointOverlayView view = new PointOverlayView(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext());
+            setSingleCircle(view, SIZE_PX);
+            view.startFadeOut();
+            ValueAnimator animator = (ValueAnimator) fadeAnimatorField.get(view);
+            assertNotNull(animator);
+            animator.setCurrentPlayTime(OverlayFadePolicy.DURATION_MS);
+
+            // What a rotation-driven refresh does to a window it reuses.
+            view.setDebugEnabled(false);
+            view.setCircles(
+                    Collections.singletonList(new OverlayClusterPlanner.PlannedCircle(
+                            POINT_ID, SIZE_PX / 2f, SIZE_PX / 2f, SIZE_PX)),
+                    new IntRect(0, 0, SIZE_PX, SIZE_PX));
+            bitmapReference.set(render(view, SIZE_PX));
+        });
+
+        try {
+            int center = SIZE_PX / 2;
+            assertEquals("circle must stay invisible after a refresh re-applies non-debug mode",
+                    0, Color.alpha(bitmapReference.get().getPixel(center, center)));
+            assertEquals(0, Color.alpha(bitmapReference.get().getPixel(0, 0)));
+        } finally {
+            bitmapReference.get().recycle();
+        }
+    }
+
+    @Test
+    public void reapplyingDebugModeDoesNotRestartTheRevealForADebugWindow() throws Exception {
+        Field fadeAnimatorField = PointOverlayView.class.getDeclaredField("fadeAnimator");
+        fadeAnimatorField.setAccessible(true);
+        AtomicReference<Object> animatorReference = new AtomicReference<>();
+
+        runOnMainSync(() -> {
+            PointOverlayView view = new PointOverlayView(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext());
+            setSingleCircle(view, SIZE_PX);
+            view.setDebugEnabled(true);
+            view.setDebugEnabled(true);
+            animatorReference.set(fadeAnimatorField.get(view));
+        });
+
+        assertNull(animatorReference.get());
+    }
+
+    /**
+     * A window rebuilt by a refresh the user did not ask for (rotation, fold, restart) goes
+     * straight to fully transparent instead of replaying the 10s reveal.
+     */
+    @Test
+    public void hideWithoutFadeMakesANewWindowImmediatelyInvisible() throws Exception {
+        Field fadeAnimatorField = PointOverlayView.class.getDeclaredField("fadeAnimator");
+        fadeAnimatorField.setAccessible(true);
+        AtomicReference<Bitmap> bitmapReference = new AtomicReference<>();
+        AtomicReference<Object> animatorReference = new AtomicReference<>();
+
+        runOnMainSync(() -> {
+            PointOverlayView view = new PointOverlayView(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext());
+            setSingleCircle(view, SIZE_PX);
+            view.hideWithoutFade();
+            animatorReference.set(fadeAnimatorField.get(view));
+            bitmapReference.set(render(view, SIZE_PX));
+        });
+
+        assertNull("hideWithoutFade must not schedule a fade", animatorReference.get());
+        try {
+            int center = SIZE_PX / 2;
+            assertEquals(0, Color.alpha(bitmapReference.get().getPixel(center, center)));
+            assertEquals(0, Color.alpha(bitmapReference.get().getPixel(0, 0)));
+        } finally {
+            bitmapReference.get().recycle();
+        }
+    }
+
+    /** Debug mode is an explicit request to see the blockers, so it outranks a silent hide. */
+    @Test
+    public void hideWithoutFadeKeepsDebugWindowsVisible() throws Exception {
+        AtomicReference<Bitmap> bitmapReference = new AtomicReference<>();
+
+        runOnMainSync(() -> {
+            PointOverlayView view = new PointOverlayView(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext());
+            setSingleCircle(view, SIZE_PX);
+            view.setDebugEnabled(true);
+            view.hideWithoutFade();
+            bitmapReference.set(render(view, SIZE_PX));
+        });
+
+        try {
+            int center = SIZE_PX / 2;
+            assertTrue(Color.alpha(bitmapReference.get().getPixel(center, center)) > 150);
+        } finally {
+            bitmapReference.get().recycle();
+        }
+    }
+
     @Test
     public void detachingFromWindowDisposesTheFadeAnimator() throws Exception {
         Field fadeAnimatorField = PointOverlayView.class.getDeclaredField("fadeAnimator");

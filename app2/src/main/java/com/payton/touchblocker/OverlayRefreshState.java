@@ -7,9 +7,15 @@ import java.util.Set;
 final class OverlayRefreshState {
     private String lastRefreshStamp;
     private Set<String> lastSuccessfulWindowKeys;
+    private boolean lastApplyIncomplete;
 
     boolean shouldSkip(String stamp, Set<String> currentWindowKeys) {
-        return stamp.equals(lastRefreshStamp)
+        // A refresh whose previous attempt could not open every window it wanted must always be
+        // retried, even when the stamp and the surviving window set both look unchanged. Without
+        // this an add that failed once (OEM overlay-window caps are a real cause) left the point
+        // listed as enabled while nothing blocked it, until the user happened to rotate or edit.
+        return !lastApplyIncomplete
+                && stamp.equals(lastRefreshStamp)
                 && lastSuccessfulWindowKeys != null
                 && lastSuccessfulWindowKeys.equals(currentWindowKeys);
     }
@@ -19,7 +25,8 @@ final class OverlayRefreshState {
     }
 
     void recordAppliedWindows(Set<String> wantedKeys, Set<String> currentWindowKeys) {
-        if (wantedKeys.equals(currentWindowKeys)) {
+        lastApplyIncomplete = !wantedKeys.equals(currentWindowKeys);
+        if (!lastApplyIncomplete) {
             lastSuccessfulWindowKeys = new HashSet<>(currentWindowKeys);
         }
     }
