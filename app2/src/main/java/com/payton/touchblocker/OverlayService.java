@@ -127,7 +127,7 @@ public class OverlayService extends Service {
         if (displayManager != null) {
             displayManager.registerDisplayListener(displayListener, null);
         }
-        startForeground(NOTIFICATION_ID, buildNotification());
+        startOverlayForeground();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && displayManager != null) {
             Display display = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
             if (display != null) {
@@ -470,6 +470,26 @@ public class OverlayService extends Service {
             }
         }
         windowsByKey.clear();
+    }
+
+    /**
+     * Enters the foreground, passing the service type on Android 14+.
+     *
+     * <p>From API 34 {@code startForeground} throws unless the type it is given matches one the
+     * manifest declares. The manifest declares {@code specialUse} (no typed category fits "block
+     * touches at chosen coordinates"), so that type is supplied here. Passing it is harmless while
+     * {@code targetSdk} is still 33 and prevents the eventual bump from becoming a crash.
+     */
+    @SuppressLint("InlinedApi")
+    private void startOverlayForeground() {
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            return;
+        }
+        startForeground(NOTIFICATION_ID, buildNotification());
     }
 
     /**

@@ -2,7 +2,10 @@ apply plugin: 'com.android.application'
 
 android {
     namespace "com.payton.touchblocker"
-    compileSdkVersion 33
+    // 34 is the minimum that can compile android:foregroundServiceType="specialUse"; AAPT rejects
+    // the value outright on 33. targetSdk deliberately stays at 33 so this change only prepares
+    // for the typed foreground-service requirement without switching on its runtime enforcement.
+    compileSdkVersion 34
 
 
 

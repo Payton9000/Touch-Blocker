@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Required alongside foregroundServiceType="specialUse" once targetSdk reaches 34. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -39,9 +41,23 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            Blocking touches at user-chosen screen coordinates does not fit any of Android 14's
+            typed foreground-service categories (camera, location, mediaPlayback, ...), so
+            specialUse is the applicable type. The subtype property below is the justification Play
+            requires. Declared now, while targetSdk is still 33, so the eventual targetSdk 34 bump
+            cannot turn into a startForeground crash.
+        -->
         <service
             android:name=".OverlayService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Blocks accidental touches at user-chosen screen coordinates using
+                    overlay windows, which must stay active while other apps are in the
+                    foreground." />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
