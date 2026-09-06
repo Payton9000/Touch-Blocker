@@ -73,13 +73,26 @@ public class BootCompletedReceiver extends BroadcastReceiver {
                 snapshot);
     }
 
+    /**
+     * Starts the overlay service, recording a refused start instead of crashing. Android 12+
+     * exempts only a specific set of broadcasts from its background foreground-service-start
+     * restriction, and {@code USER_UNLOCKED} is not among them -- on a device with a secure lock
+     * screen it also arrives before {@code BOOT_COMPLETED}. An unguarded call therefore surfaced
+     * as a "keeps stopping" dialog on the first unlock after a reboot.
+     */
     private void startOverlayService(Context context, String action) {
         Intent serviceIntent = new Intent(context, OverlayService.class);
         serviceIntent.setAction(action);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent);
-        } else {
-            context.startService(serviceIntent);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent);
+            } else {
+                context.startService(serviceIntent);
+            }
+        } catch (RuntimeException refused) {
+            Log.w(TAG, "Unable to start overlay service after boot", refused);
+            PointStore.setPendingBootRestoreFailure(
+                    context, BootRestoreDecision.FailureReason.SERVICE_START_REFUSED);
         }
     }
 }

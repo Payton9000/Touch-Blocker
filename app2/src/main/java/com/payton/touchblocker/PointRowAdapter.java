@@ -16,12 +16,15 @@ import com.payton.touchblocker.profile.ProfilePoint;
 import com.payton.touchblocker.profile.ScreenProfile;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** RecyclerView binding for immutable profile points. */
 public final class PointRowAdapter extends RecyclerView.Adapter<PointRowAdapter.Holder> {
     private final Listener listener;
     private final List<ProfilePoint> points = new ArrayList<>();
+    private final Set<Integer> shadowed = new HashSet<>();
     private float globalDp = ScreenProfile.DEFAULT_GLOBAL_DIAMETER_DP;
 
     public interface Listener {
@@ -40,9 +43,25 @@ public final class PointRowAdapter extends RecyclerView.Adapter<PointRowAdapter.
     }
 
     public void submit(List<ProfilePoint> newPoints, float newGlobalDp) {
+        submit(newPoints, newGlobalDp, java.util.Collections.<Integer>emptySet());
+    }
+
+    /**
+     * @param shadowedPointIds ids of points a visible system bar would intercept before the
+     *     overlay sees them; each row says so, since such a point looks enabled but only takes
+     *     effect while that bar is hidden.
+     */
+    public void submit(
+            List<ProfilePoint> newPoints,
+            float newGlobalDp,
+            java.util.Set<Integer> shadowedPointIds) {
         points.clear();
         points.addAll(newPoints);
         globalDp = newGlobalDp;
+        shadowed.clear();
+        if (shadowedPointIds != null) {
+            shadowed.addAll(shadowedPointIds);
+        }
         notifyDataSetChanged();
     }
 
@@ -65,12 +84,17 @@ public final class PointRowAdapter extends RecyclerView.Adapter<PointRowAdapter.
                 listener.onEnableChanged(point.getId(), checked));
 
         int reasonString = ManagePointsActivity.disabledReasonString(point.getDisabledReason());
-        if (point.isEnabled() || reasonString == 0) {
-            holder.disabledReason.setVisibility(View.GONE);
-            holder.disabledReason.setText("");
-        } else {
+        if (!point.isEnabled() && reasonString != 0) {
             holder.disabledReason.setVisibility(View.VISIBLE);
             holder.disabledReason.setText(reasonString);
+        } else if (point.isEnabled() && shadowed.contains(point.getId())) {
+            // Enabled, but a visible status/navigation bar outranks the overlay here, so the point
+            // only blocks while that bar is hidden (e.g. fullscreen video).
+            holder.disabledReason.setVisibility(View.VISIBLE);
+            holder.disabledReason.setText(R.string.point_under_system_bar);
+        } else {
+            holder.disabledReason.setVisibility(View.GONE);
+            holder.disabledReason.setText("");
         }
 
         float overrideDp = normalizeOverride(point.getDiameterDpOverride());

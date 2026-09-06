@@ -15,6 +15,8 @@
     <string name="auto_start_on_boot_hint">Some devices may also require allowing auto-start or background launch in system settings.</string>
     <string name="auto_start_on_boot_failure_missing_permission">Auto-start skipped after reboot because overlay permission is missing.</string>
     <string name="auto_start_on_boot_failure_no_points">Auto-start skipped after reboot because there are no enabled block points.</string>
+    <string name="overlay_failure_service_refused">The overlay could not start, so it was turned off and touches are not being blocked. Turn it on again to retry.</string>
+    <string name="point_under_system_bar">Only blocks while the system bar here is hidden (for example fullscreen video).</string>
     <string name="workspace_title">Workspace</string>
     <string name="workspace_description">Capture touch points, fine-tune block regions, and validate the result with a quick test.</string>
     <string name="start_recording">Start Recording</string>

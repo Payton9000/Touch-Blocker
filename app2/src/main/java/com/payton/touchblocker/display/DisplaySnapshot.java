@@ -16,6 +16,7 @@ public final class DisplaySnapshot {
     private final ProfileKind suggestedKind;
     private final List<DisplayRegion> regions;
     private final List<UnsafeArea> unsafeAreas;
+    private final EdgeInsets systemBarInsets;
 
     public DisplaySnapshot(
             String stableKey,
@@ -53,11 +54,40 @@ public final class DisplaySnapshot {
             List<DisplayRegion> regions,
             List<UnsafeArea> unsafeAreas
     ) {
+        this(
+                stableKey,
+                displayId,
+                bounds,
+                rotation,
+                density,
+                generation,
+                suggestedKind,
+                regions,
+                unsafeAreas,
+                EdgeInsets.NONE
+        );
+    }
+
+    public DisplaySnapshot(
+            String stableKey,
+            int displayId,
+            IntRect bounds,
+            int rotation,
+            float density,
+            long generation,
+            ProfileKind suggestedKind,
+            List<DisplayRegion> regions,
+            List<UnsafeArea> unsafeAreas,
+            EdgeInsets systemBarInsets
+    ) {
         if (stableKey == null) {
             throw new NullPointerException("stableKey == null");
         }
         if (bounds == null) {
             throw new NullPointerException("bounds == null");
+        }
+        if (systemBarInsets == null) {
+            throw new NullPointerException("systemBarInsets == null");
         }
         this.stableKey = stableKey;
         this.displayId = displayId;
@@ -68,6 +98,17 @@ public final class DisplaySnapshot {
         this.suggestedKind = suggestedKind;
         this.regions = immutableCopy(regions, "regions");
         this.unsafeAreas = immutableCopy(unsafeAreas, "unsafeAreas");
+        this.systemBarInsets = systemBarInsets;
+    }
+
+    /**
+     * System-bar insets ignoring visibility. Regions stay edge-to-edge on purpose, so these are
+     * not carved out of the blockable area; they only mark where a visible status/navigation bar
+     * would outrank the overlay in the window hit-test. See
+     * {@link com.payton.touchblocker.geometry.SystemBarShadow}.
+     */
+    public EdgeInsets getSystemBarInsets() {
+        return systemBarInsets;
     }
 
     public String getStableKey() {

@@ -30,9 +30,10 @@ import com.payton.touchblocker.profile.FoldableUi;
 import com.payton.touchblocker.profile.ActiveProfileResolver;
 import com.payton.touchblocker.profile.ProfileDocument;
 import com.payton.touchblocker.profile.ProfileKind;
+import com.payton.touchblocker.profile.ProfileJsonCodec;
 import com.payton.touchblocker.profile.ProfileRepository;
-import com.payton.touchblocker.profile.ProfileRepositoryFactory;
 import com.payton.touchblocker.profile.ProfileSelection;
+import com.payton.touchblocker.profile.ProfileStoreMigration;
 import com.payton.touchblocker.profile.ScreenProfile;
 import com.payton.touchblocker.profile.SharedPreferencesKeyValueStore;
 import com.payton.touchblocker.ui.PreviewModelFactory;
@@ -79,9 +80,13 @@ public class MainActivity extends AppCompatActivity {
         FullscreenWindow.apply(this);
         setContentView(R.layout.activity_main);
 
-        repository = ProfileRepositoryFactory.create(
-                name -> new SharedPreferencesKeyValueStore(
-                        getSharedPreferences(name, MODE_PRIVATE)));
+        // Must be the same preference file the recorder, point manager, overlay service and boot
+        // receiver use. When this screen read its own file instead, recorded points were invisible
+        // here and the preview disagreed with what was actually being blocked.
+        repository = new ProfileRepository(
+                new SharedPreferencesKeyValueStore(PointStore.prefs(this)),
+                new ProfileJsonCodec());
+        migrateLegacyProfileBindings();
         bindViews();
         configureEdgeToEdge();
         configureActions();
@@ -212,10 +217,10 @@ public class MainActivity extends AppCompatActivity {
                 OverlayPermission.request(MainActivity.this);
                 return;
             }
+            // Only records the boot preference. It must not flip the overlay's own enabled flag:
+            // doing so made the UI report the overlay as ON while no service was running and
+            // nothing was blocking, and armed an overlay the user never asked to start.
             PointStore.setBootRestoreEnabled(MainActivity.this, enabled);
-            if (enabled) {
-                PointStore.setOverlayShouldBeEnabled(MainActivity.this, true);
-            }
             PointStore.clearPendingBootRestoreFailure(MainActivity.this);
             refreshUiState();
         });
@@ -271,6 +276,32 @@ public class MainActivity extends AppCompatActivity {
                     new String[]{Manifest.permission.POST_NOTIFICATIONS},
                     REQUEST_NOTIFICATION_PERMISSION);
         }
+    }
+
+    /**
+     * Carries the user's Inner/Outer profile choice over from the preference file this screen used
+     * before the storage namespaces were unified, so unifying them does not silently reset it.
+     */
+    private void migrateLegacyProfileBindings() {
+        SharedPreferences canonicalPrefs = PointStore.prefs(this);
+        if (canonicalPrefs.getBoolean(ProfileStoreMigration.KEY_BINDINGS_MERGED, false)) {
+            return;
+        }
+        ProfileRepository.LoadResult loaded = repository.load();
+        if (loaded.isSuccess()) {
+            ProfileDocument merged = ProfileStoreMigration.mergeLegacyBindings(
+                    loaded.getDocument(),
+                    new SharedPreferencesKeyValueStore(canonicalPrefs),
+                    new SharedPreferencesKeyValueStore(getSharedPreferences(
+                            ProfileStoreMigration.LEGACY_PROFILE_PREFS, MODE_PRIVATE)),
+                    new ProfileJsonCodec());
+            if (merged != null) {
+                repository.save(merged);
+            }
+        }
+        canonicalPrefs.edit()
+                .putBoolean(ProfileStoreMigration.KEY_BINDINGS_MERGED, true)
+                .apply();
     }
 
     private void refreshPreview() {
@@ -464,6 +495,8 @@ public class MainActivity extends AppCompatActivity {
             failureResId = R.string.auto_start_on_boot_failure_missing_permission;
         } else if (failureReason == BootRestoreDecision.FailureReason.NO_ENABLED_POINTS) {
             failureResId = R.string.auto_start_on_boot_failure_no_points;
+        } else if (failureReason == BootRestoreDecision.FailureReason.SERVICE_START_REFUSED) {
+            failureResId = R.string.overlay_failure_service_refused;
         }
 
         if (failureResId == 0) {

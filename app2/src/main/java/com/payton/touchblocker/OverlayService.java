@@ -13,7 +13,9 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import androidx.core.app.NotificationCompat;
 import android.util.Log;
 import android.view.Display;
@@ -32,6 +34,9 @@ import com.payton.touchblocker.display.WindowLayoutInfoObserver;
 import com.payton.touchblocker.geometry.OverlayClusterPlanner;
 import com.payton.touchblocker.geometry.OverlayRefreshPlanner;
 import com.payton.touchblocker.profile.ActiveProfiles;
+import com.payton.touchblocker.profile.ProfileDocument;
+import com.payton.touchblocker.profile.ProfileFallback;
+import com.payton.touchblocker.profile.LegacyRemigration;
 import com.payton.touchblocker.profile.ProfileJsonCodec;
 import com.payton.touchblocker.profile.ProfileKind;
 import com.payton.touchblocker.profile.ProfileRepository;
@@ -66,6 +71,25 @@ public class OverlayService extends Service {
     private final OverlayRefreshState refreshState = new OverlayRefreshState();
     private Context foldWindowContext;
     private final WindowLayoutInfoObserver foldObserver = new WindowLayoutInfoObserver();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    /**
+     * Coalesces the burst of display callbacks a single rotation or fold produces. One rotation
+     * delivers up to four separate triggers (display change, fold observer, configuration change),
+     * and each refresh captures a display snapshot, migrates, re-validates every point and can
+     * commit to disk synchronously. Running that burst back-to-back on the main thread stalled it
+     * for close to a second, and a stalled main thread means the overlay windows stop consuming
+     * touches -- the "rapid tapping stops blocking" symptom. Debouncing collapses the burst into
+     * one refresh once the display has settled.
+     */
+    private final Runnable coalescedRefresh = new Runnable() {
+        @Override
+        public void run() {
+            if (overlayEnabled) {
+                refreshOverlayPoints(false);
+            }
+        }
+    };
     private final DisplayManager.DisplayListener displayListener = new DisplayManager.DisplayListener() {
         @Override
         public void onDisplayAdded(int displayId) {
@@ -77,11 +101,20 @@ public class OverlayService extends Service {
 
         @Override
         public void onDisplayChanged(int displayId) {
-            if (overlayEnabled) {
-                refreshOverlayPoints();
-            }
+            scheduleCoalescedRefresh();
         }
     };
+
+    /** Debounce window for system-driven refreshes; long enough to absorb one rotation's burst. */
+    private static final long REFRESH_DEBOUNCE_MS = 150L;
+
+    private void scheduleCoalescedRefresh() {
+        if (!overlayEnabled) {
+            return;
+        }
+        mainHandler.removeCallbacks(coalescedRefresh);
+        mainHandler.postDelayed(coalescedRefresh, REFRESH_DEBOUNCE_MS);
+    }
 
     @Override
     public void onCreate() {
@@ -105,9 +138,7 @@ public class OverlayService extends Service {
                     public void run() {
                         // Rotation broadcasts can precede the corresponding WindowLayoutInfo
                         // update. Rebuild once the hinge has its current orientation.
-                        if (overlayEnabled) {
-                            refreshOverlayPoints();
-                        }
+                        scheduleCoalescedRefresh();
                     }
                 });
             }
@@ -132,20 +163,21 @@ public class OverlayService extends Service {
                 return START_NOT_STICKY;
             }
             overlayEnabled = true;
-            refreshOverlayPoints();
+            // A restart by the system is not a user action, so the blockers come back silently.
+            refreshOverlayPoints(OverlayRevealPolicy.shouldRevealNewWindows(null));
             return START_STICKY;
         }
         String action = intent.getAction();
         Log.d(TAG, "onStartCommand action=" + action);
-        if (ACTION_START_OVERLAY.equals(action)) {
+        if (ACTION_START_OVERLAY.equals(action) || ACTION_REFRESH_POINTS.equals(action)) {
             overlayEnabled = true;
-            refreshOverlayPoints();
+            refreshOverlayPoints(OverlayRevealPolicy.shouldRevealNewWindows(action));
         } else if (ACTION_STOP_OVERLAY.equals(action)) {
-            overlayEnabled = false;
-            hideOverlay();
-        } else if (ACTION_REFRESH_POINTS.equals(action)) {
-            overlayEnabled = true;
-            refreshOverlayPoints();
+            // Stopping means stopping: leaving the foreground service up kept an
+            // undismissable "overlay running" notification in the shade forever, because the
+            // notification is setOngoing(true) and nothing ever took it down.
+            stopOverlayCompletely();
+            return START_NOT_STICKY;
         } else if (ACTION_SET_DEBUG.equals(action)) {
             boolean enabled = intent.getBooleanExtra(EXTRA_DEBUG_ENABLED, false);
             Log.d(TAG, "set debug=" + enabled);
@@ -158,6 +190,7 @@ public class OverlayService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        mainHandler.removeCallbacks(coalescedRefresh);
         if (displayManager != null) {
             displayManager.unregisterDisplayListener(displayListener);
         }
@@ -168,9 +201,7 @@ public class OverlayService extends Service {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        if (overlayEnabled) {
-            refreshOverlayPoints();
-        }
+        scheduleCoalescedRefresh();
     }
 
     @Override
@@ -178,8 +209,16 @@ public class OverlayService extends Service {
         return null;
     }
 
-    private void refreshOverlayPoints() {
-        Log.d(TAG, "refreshOverlayPoints");
+    /**
+     * Rebuilds the overlay windows for the current display geometry and active profile.
+     *
+     * @param revealNewWindows whether windows created by this refresh should play the visible
+     *     fade-out. Only a user-initiated start or point edit passes {@code true}; refreshes
+     *     driven by the system (rotation, fold, configuration change, service restart) pass
+     *     {@code false} so the blockers stay invisible instead of flashing red on every rotate.
+     */
+    private void refreshOverlayPoints(boolean revealNewWindows) {
+        Log.d(TAG, "refreshOverlayPoints reveal=" + revealNewWindows);
         DisplaySnapshot snapshot = captureDisplaySnapshot();
         if (snapshot == null) {
             hideOverlay();
@@ -196,34 +235,87 @@ public class OverlayService extends Service {
             hideOverlay();
             return;
         }
-        ActiveProfiles.Active active = ActiveProfiles.ensure(loaded.getDocument(), snapshot);
-        if (active == null || active.isCreated()) {
-            // AMBIGUOUS or brand-new empty profile -> nothing to block.
-            if (active != null && active.isCreated()) {
-                repository.save(active.getDocument());
+        // One-time repair for profiles written by the first v2 migration, whose points had no
+        // rotation anchor and therefore drifted across the glass on every screen rotation.
+        if (LegacyRemigration.repairIfNeeded(
+                repository,
+                new SharedPreferencesKeyValueStore(PointStore.prefs(this)),
+                PointStore.getRawPointsJson(this),
+                PointStore.getGlobalSizePx(this),
+                snapshot)) {
+            Log.d(TAG, "repaired rotation anchors from legacy backup");
+            loaded = repository.load();
+            if (!loaded.isSuccess()) {
+                hideOverlay();
+                return;
             }
+        }
+        ActiveProfiles.Active active = ActiveProfiles.ensure(loaded.getDocument(), snapshot);
+        ProfileDocument document = active == null ? loaded.getDocument() : active.getDocument();
+        String profileId = active == null ? null : active.getProfileId();
+        if (active != null && active.isCreated()) {
+            repository.save(active.getDocument());
+        }
+        // Fall back whenever the selected profile cannot block anything -- either no profile was
+        // selected at all, or the one selected for this display is empty. Both happen for reasons
+        // the user never asked for: folding, or changing the system display-size setting, each of
+        // which changes the display fingerprint. Tearing every window down here while still
+        // reporting the overlay as ON is what made blocking silently stop working.
+        if (!hasEnabledPoints(document, profileId)) {
+            String fallbackId = ProfileFallback.selectFallbackProfileId(document, snapshot);
+            if (fallbackId == null) {
+                // Genuinely nothing to block anywhere: no stored profile has enabled points.
+                hideOverlay();
+                return;
+            }
+            Log.d(TAG, "profile " + profileId + " has nothing to block; using " + fallbackId);
+            profileId = fallbackId;
+        }
+        ScreenProfile profile = document.getProfiles().get(profileId);
+        if (profile == null) {
             hideOverlay();
             return;
         }
-        ScreenProfile profile = active.getDocument().getProfiles().get(active.getProfileId());
         ScreenProfile revalidated = new ProfileRevalidator().revalidate(profile, snapshot);
         if (revalidated != profile) {
             // Clears stale HINGE/CUTOUT disabled bits (spec Section 5) and records new
             // OUT_OF_BOUNDS points.
-            repository.save(active.getDocument().withProfile(revalidated));
+            repository.save(document.withProfile(revalidated));
             profile = revalidated;
         }
         boolean debugEnabled = PointStore.isDebugOverlayEnabled(this);
         String stamp = snapshot.getStableKey() + '|' + snapshot.getGeneration()
-                + '|' + repository.getRevision() + '|' + debugEnabled;
+                + '|' + repository.getRevision() + '|' + debugEnabled
+                + '|' + profile.getId();
         if (refreshState.shouldSkip(stamp, windowsByKey.keySet())) {
             return;
         }
         refreshState.recordRefreshAttempt(stamp);
-        applyWindowPlans(OverlayRefreshPlanner.plan(snapshot, profile), debugEnabled);
+        applyWindowPlans(
+                OverlayRefreshPlanner.plan(snapshot, profile), debugEnabled, revealNewWindows);
     }
 
-    private void applyWindowPlans(List<OverlayClusterPlanner.WindowPlan> plans, boolean debugEnabled) {
+    /** Whether {@code profileId} names a stored profile that has at least one enabled point. */
+    private static boolean hasEnabledPoints(ProfileDocument document, String profileId) {
+        if (profileId == null) {
+            return false;
+        }
+        ScreenProfile profile = document.getProfiles().get(profileId);
+        if (profile == null) {
+            return false;
+        }
+        for (com.payton.touchblocker.profile.ProfilePoint point : profile.getPoints()) {
+            if (point.isEnabled()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void applyWindowPlans(
+            List<OverlayClusterPlanner.WindowPlan> plans,
+            boolean debugEnabled,
+            boolean revealNewWindows) {
         Set<String> wanted = new HashSet<>();
         int failures = 0;
         for (OverlayClusterPlanner.WindowPlan plan : plans) {
@@ -245,7 +337,7 @@ public class OverlayService extends Service {
                 }
                 continue;
             }
-            if (!addWindow(plan, debugEnabled)) {
+            if (!addWindow(plan, debugEnabled, revealNewWindows)) {
                 failures++;
             }
         }
@@ -264,11 +356,16 @@ public class OverlayService extends Service {
      * Builds a window for a brand-new plan and adds it via {@link #windowManager}, retrying
      * {@code addView} once on {@link RuntimeException} before reporting failure. Only called when
      * {@link #windowsByKey} has no existing entry for {@code plan.key()}, so a successful add here
-     * is always this window's first, and {@link PointOverlayView#startFadeOut()} is fired
-     * accordingly (unless debug mode is on).
+     * is always this window's first. It then either plays the visible
+     * {@link PointOverlayView#startFadeOut()} reveal or, when this refresh was triggered by the
+     * system rather than the user, goes straight to
+     * {@link PointOverlayView#hideWithoutFade()} (unless debug mode is on).
      */
     @SuppressLint("NewApi")
-    private boolean addWindow(OverlayClusterPlanner.WindowPlan plan, boolean debugEnabled) {
+    private boolean addWindow(
+            OverlayClusterPlanner.WindowPlan plan,
+            boolean debugEnabled,
+            boolean revealNewWindows) {
         IntRect bounds = plan.getBounds();
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 bounds.width(),
@@ -288,7 +385,9 @@ public class OverlayService extends Service {
 
         PointOverlayView view = new PointOverlayView(this);
         view.setCircles(plan.getMembers(), bounds);
-        view.setDebugEnabled(debugEnabled);
+        if (debugEnabled) {
+            view.setDebugEnabled(true);
+        }
 
         boolean added = false;
         RuntimeException lastFailure = null;
@@ -307,7 +406,11 @@ public class OverlayService extends Service {
         cacheCutoutInsets(view);
         windowsByKey.put(plan.key(), new OverlayEntry(view, params));
         if (!debugEnabled) {
-            view.startFadeOut();
+            if (revealNewWindows) {
+                view.startFadeOut();
+            } else {
+                view.hideWithoutFade();
+            }
         }
         return true;
     }
@@ -369,8 +472,13 @@ public class OverlayService extends Service {
         windowsByKey.clear();
     }
 
-    private void failOverlaySetup() {
+    /**
+     * Tears the overlay down and takes the foreground service and its notification with it.
+     * Used both for a user-requested stop and for an unrecoverable setup failure.
+     */
+    private void stopOverlayCompletely() {
         overlayEnabled = false;
+        mainHandler.removeCallbacks(coalescedRefresh);
         hideOverlay();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE);
@@ -378,6 +486,22 @@ public class OverlayService extends Service {
             stopForeground(true);
         }
         stopSelf();
+    }
+
+    /**
+     * Every overlay window failed to attach, so blocking cannot work. Clearing the persisted
+     * "should be enabled" flag is the important part: without it the UI kept showing the overlay
+     * as ON after the service had given up, so the user believed their screen was protected when
+     * nothing was intercepting touches.
+     */
+    private void failOverlaySetup() {
+        Log.w(TAG, "overlay setup failed; disabling and reporting to the UI");
+        PointStore.setOverlayShouldBeEnabled(this, false);
+        // Deliberately not MISSING_PERMISSION: refreshUiState() clears that reason whenever the
+        // permission is in fact granted, which would erase this report and leave the UI silent.
+        PointStore.setPendingBootRestoreFailure(
+                this, BootRestoreDecision.FailureReason.SERVICE_START_REFUSED);
+        stopOverlayCompletely();
     }
 
     private DisplaySnapshot captureDisplaySnapshot() {
@@ -399,12 +523,14 @@ public class OverlayService extends Service {
         }
     }
 
+    /**
+     * Applies a debug-mode toggle the user just made. Turning it off is a deliberate user
+     * action, so the fade-out reveal that {@link PointOverlayView#setDebugEnabled} starts is
+     * wanted here even though a system-driven refresh suppresses it.
+     */
     private void applyDebugToOverlays(boolean enabled) {
         for (OverlayEntry entry : windowsByKey.values()) {
             entry.view.setDebugEnabled(enabled);
-            if (!enabled) {
-                entry.view.startFadeOut();
-            }
         }
     }
 

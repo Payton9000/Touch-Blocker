@@ -6,7 +6,9 @@ public class BootRestoreDecision {
         AUTO_START_DISABLED,
         OVERLAY_DISABLED,
         MISSING_PERMISSION,
-        NO_ENABLED_POINTS
+        NO_ENABLED_POINTS,
+        /** The system refused to start the service, or every overlay window failed to attach. */
+        SERVICE_START_REFUSED
     }
 
     private final FailureReason failureReason;

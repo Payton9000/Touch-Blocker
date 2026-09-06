@@ -15,6 +15,8 @@
     <string name="auto_start_on_boot_hint">部分设备还需要在系统设置中允许自启动或后台启动。</string>
     <string name="auto_start_on_boot_failure_missing_permission">开机自动恢复已跳过：缺少悬浮窗权限。</string>
     <string name="auto_start_on_boot_failure_no_points">开机自动恢复已跳过：没有启用的屏蔽点。</string>
+    <string name="overlay_failure_service_refused">悬浮层无法启动，已自动关闭，当前不会拦截触摸。请重新开启后再试。</string>
+    <string name="point_under_system_bar">仅在此处系统栏隐藏时生效（例如全屏视频）。</string>
     <string name="workspace_title">工作区</string>
     <string name="workspace_description">记录触摸点、微调屏蔽区域，并通过快速测试验证结果。</string>
     <string name="start_recording">开始录制</string>

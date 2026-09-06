@@ -69,15 +69,8 @@ public final class DisplaySnapshotMapper {
                 generation,
                 suggestedKind,
                 regions,
-                unsafeAreas);
-    }
-
-    private static IntRect inset(IntRect bounds, EdgeInsets insets) {
-        int left = Math.min(bounds.getRight(), bounds.getLeft() + Math.max(0, insets.getLeft()));
-        int top = Math.min(bounds.getBottom(), bounds.getTop() + Math.max(0, insets.getTop()));
-        int right = Math.max(left, bounds.getRight() - Math.max(0, insets.getRight()));
-        int bottom = Math.max(top, bounds.getBottom() - Math.max(0, insets.getBottom()));
-        return new IntRect(left, top, right, bottom);
+                unsafeAreas,
+                safeInsets);
     }
 
     private static boolean addSeparatedRegions(

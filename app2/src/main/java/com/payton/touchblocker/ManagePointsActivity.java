@@ -20,6 +20,9 @@ import com.payton.touchblocker.display.DisplayGenerationTracker;
 import com.payton.touchblocker.display.DisplaySnapshot;
 import com.payton.touchblocker.display.DisplaySnapshotProvider;
 import com.payton.touchblocker.display.WindowLayoutInfoObserver;
+import com.payton.touchblocker.geometry.CoordinateTransformer;
+import com.payton.touchblocker.geometry.ResolvedPoint;
+import com.payton.touchblocker.geometry.SystemBarShadow;
 import com.payton.touchblocker.profile.ActiveProfiles;
 import com.payton.touchblocker.profile.FoldableUi;
 import com.payton.touchblocker.profile.PointDisabledReason;
@@ -219,7 +222,41 @@ public class ManagePointsActivity extends AppCompatActivity {
                 activeProfile.getGlobalDiameterDp());
         globalSizeSlider.setValue(sliderDiameterDp);
         renderGlobalSize(sliderDiameterDp);
-        pointAdapter.submit(activeProfile.getPoints(), sliderDiameterDp);
+        pointAdapter.submit(
+                activeProfile.getPoints(), sliderDiameterDp, shadowedPointIds());
+    }
+
+    /**
+     * Ids of enabled points a visible system bar would intercept before the overlay sees them.
+     * Their rows say so, because such a point looks active but only blocks while that bar is
+     * hidden (see {@link SystemBarShadow}).
+     */
+    private java.util.Set<Integer> shadowedPointIds() {
+        java.util.Set<Integer> ids = new java.util.HashSet<>();
+        if (activeProfile == null || currentSnapshot == null) {
+            return ids;
+        }
+        for (ProfilePoint point : activeProfile.getPoints()) {
+            if (!point.isEnabled()) {
+                continue;
+            }
+            float diameterDp = point.getDiameterDpOverride() > 0f
+                    ? point.getDiameterDpOverride()
+                    : activeProfile.getGlobalDiameterDp();
+            ResolvedPoint resolved = CoordinateTransformer.resolve(
+                    currentSnapshot, point, diameterDp);
+            if (resolved == null) {
+                continue;
+            }
+            if (SystemBarShadow.isShadowed(
+                    currentSnapshot.getBounds(),
+                    currentSnapshot.getSystemBarInsets(),
+                    resolved.getCenterX(),
+                    resolved.getCenterY())) {
+                ids.add(point.getId());
+            }
+        }
+        return ids;
     }
 
     private void renderGlobalSize(float diameterDp) {
