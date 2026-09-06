@@ -25,7 +25,7 @@ public class ProfilePointTest {
                 7, "left", 0.25f, 0.75f, 48f, true,
                 PointDisabledReason.NONE, 1000L, 120L, 3L);
 
-        ProfilePoint corrected = point.withPosition("right", 0.5f, 0.4f, 4L);
+        ProfilePoint corrected = point.withPosition("right", 0.5f, 0.4f, 0.6f, 0.3f, 4L);
 
         assertEquals(7, corrected.getId());
         assertEquals(48f, corrected.getDiameterDpOverride(), 0f);
@@ -78,6 +78,35 @@ public class ProfilePointTest {
         assertEquals(0.7f, point.getNaturalV(), 0f);
         assertEquals(0.4f, point.withDiameterDpOverride(48f).getNaturalU(), 0f);
         assertEquals(0.7f, point.disabled(PointDisabledReason.NEEDS_REVIEW).getNaturalV(), 0f);
+    }
+
+    /**
+     * Moving a point must carry a recomputed natural anchor. The earlier signature took only
+     * {@code u}/{@code v} and reset the anchor, which would have made the moved point drift to a
+     * different physical spot on every screen rotation.
+     */
+    @Test
+    public void movingAPointKeepsItRotationAnchored() {
+        ProfilePoint point = ProfilePoint.enabledWithNaturalAnchor(
+                1, "full", 0.2f, 0.3f, 0.2f, 0.3f, 10L, 20L, 1L);
+
+        ProfilePoint moved = point.withPosition("full", 0.6f, 0.8f, 0.6f, 0.8f, 2L);
+
+        assertTrue("a moved point must stay rotation-anchored", moved.hasNaturalAnchor());
+        assertEquals(0.6f, moved.getNaturalU(), 0f);
+        assertEquals(0.8f, moved.getNaturalV(), 0f);
+    }
+
+    /** An uncomputable anchor is still representable, and reports itself as unanchored. */
+    @Test
+    public void movingAPointWithoutAComputableAnchorIsRepresentable() {
+        ProfilePoint point = ProfilePoint.enabledWithNaturalAnchor(
+                1, "full", 0.2f, 0.3f, 0.2f, 0.3f, 10L, 20L, 1L);
+
+        ProfilePoint moved = point.withPosition("full", 0.6f, 0.8f, -1f, -1f, 2L);
+
+        assertFalse(moved.hasNaturalAnchor());
+        assertEquals(0.6f, moved.getU(), 0f);
     }
 
     @Test

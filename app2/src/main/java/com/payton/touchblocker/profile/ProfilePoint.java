@@ -110,7 +110,24 @@ public final class ProfilePoint {
         this.naturalV = naturalV;
     }
 
-    public ProfilePoint withPosition(String regionId, float u, float v, long generation) {
+    /**
+     * Returns a copy moved to a new position, in both region-relative and natural coordinates.
+     *
+     * <p>The natural anchor is what keeps a point on the same physical spot on the glass when the
+     * screen rotates, so moving a point requires recomputing it -- use
+     * {@link com.payton.touchblocker.geometry.CoordinateTransformer#naturalAnchor}. It is a required
+     * parameter on purpose: the earlier signature took only {@code u}/{@code v} and silently reset
+     * the anchor, which would have made any moved point drift across the screen on every rotation.
+     * Pass {@code naturalU}/{@code naturalV} outside 0..1 only when the anchor genuinely cannot be
+     * computed, which downgrades the point to the non-rotation-invariant path.
+     */
+    public ProfilePoint withPosition(
+            String regionId,
+            float u,
+            float v,
+            float naturalU,
+            float naturalV,
+            long generation) {
         return new ProfilePoint(
                 id,
                 regionId,
@@ -122,8 +139,8 @@ public final class ProfilePoint {
                 timestamp,
                 durationMs,
                 generation,
-                NO_NATURAL_ANCHOR,
-                NO_NATURAL_ANCHOR
+                naturalU,
+                naturalV
         );
     }
 
