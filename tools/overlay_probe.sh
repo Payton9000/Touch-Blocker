@@ -11,66 +11,16 @@ set -uo pipefail
 PKG=com.payton.touchblocker
 PREFS=/data/data/$PKG/shared_prefs/touch_blocker_prefs.xml
 ADB="${ADB:-adb}"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=overlay_dump.sh
+. "$DIR/overlay_dump.sh"
 
 # --- helpers ---------------------------------------------------------------
 
-# Counts the app's APPLICATION_OVERLAY windows.
-ov_count() {
-  $ADB shell dumpsys window windows 2>/dev/null | awk '
-    /Window #[0-9]+ Window\{.*'"$PKG"'\}:/ { p = 1 }
-    p && /mAttrs=/ { if (/APPLICATION_OVERLAY/) c++; p = 0 }
-    END { print c + 0 }'
-}
-
-# Prints "x y w h" for each overlay window.
-ov_rects() {
-  $ADB shell dumpsys window windows 2>/dev/null \
-    | grep "ty=APPLICATION_OVERLAY" \
-    | grep -oE "mAttrs=\{\([0-9-]+,[0-9-]+\)\([0-9]+x[0-9]+\)" \
-    | sed 's/mAttrs={(//; s/)(/ /; s/x/ /; s/,/ /; s/)$//'
-}
-
-# Current logical size, accounting for rotation. `wm size` reports the unrotated physical
-# size, so a 90/270 turn would otherwise reject in-bounds taps as "offscreen" and send
-# out-of-bounds taps into the shorter axis.
-screen_wh() {
-  # The display's "real" size is already rotated and already reflects any `wm size` override,
-  # so it needs no manual swap. Falls back to swapping the physical size by rotation.
-  local real
-  real=$($ADB shell dumpsys display 2>/dev/null | tr -d '
-'          | grep -oE "mOverrideDisplayInfo=DisplayInfo\{[^}]*real [0-9]+ x [0-9]+"          | grep -oE "real [0-9]+ x [0-9]+" | head -1 | grep -oE "[0-9]+ x [0-9]+")
-  if [ -n "$real" ]; then
-    echo "${real% x *} ${real##* x }"
-    return 0
-  fi
-  local physical rot w h
-  physical=$($ADB shell wm size 2>/dev/null | tr -d '
-' | grep -oE '[0-9]+x[0-9]+' | tail -1)
-  rot=$(rotation)
-  w=${physical%x*}; h=${physical#*x}
-  case "$rot" in
-    ROTATION_90|ROTATION_270) echo "$h $w" ;;
-    *) echo "$w $h" ;;
-  esac
-}
 
 
-# Reads rotation from the Display record, which reflects the state the window manager is actually
-# using. The per-window mRotation can read `undefined` for windows that have not been reconfigured
-# yet, so it is not a reliable source.
-rotation() {
-  # Prefer the display's own record: it is correct even under a `wm size` override, where
-  # `dumpsys window displays` prints nothing at all. Falls back to the window-manager value.
-  local rot
-  rot=$($ADB shell dumpsys display 2>/dev/null | tr -d '
-'         | grep -oE "mOverrideDisplayInfo=DisplayInfo\{[^}]*rotation [0-9]+"         | grep -oE "rotation [0-9]+$" | grep -oE "[0-9]+" | head -1)
-  if [ -n "$rot" ]; then
-    echo "ROTATION_$((rot * 90))"
-    return 0
-  fi
-  $ADB shell dumpsys window 2>/dev/null | tr -d '
-'     | grep -oE "mRotation=ROTATION_[0-9]+" | grep -oE "ROTATION_[0-9]+" | head -1
-}
+
+
 
 
 # --- profile seeding -------------------------------------------------------
@@ -159,39 +109,6 @@ start_overlay() {
   ov_count
 }
 
-# Screen rows covered by a system bar whose window sits ABOVE an app overlay in Z-order.
-# TYPE_APPLICATION_OVERLAY is layer 111000 while StatusBar is 151000, and no window type above
-# that is available to a normal app, so the system bar wins the hit-test there whenever it is
-# visible. Those rows are excluded from pass/fail scoring and reported separately by
-# probe_shadowed, because a miss there is a platform limit rather than an app defect.
-# System-bar regions in the same coordinate space as overlay window positions.
-#
-# `dumpsys input` reports a bar's touchableRegion in the display's UNROTATED space, while overlay
-# windows are positioned in the current rotated space. At rotation 90 the status bar therefore
-# shows up as [2134,0][2208,1840] (a right-hand strip of the unrotated frame) even though it is
-# drawn along the visual top edge. Deriving the strip from the bar's own thickness and the current
-# rotation puts both in one space; without this the harness scored real blocks as failures.
-system_bar_rows() {
-  local sw sh thickness
-  read -r sw sh < <(screen_wh)
-  # Two dumpsys input formats are in the wild: API 30+ prints `name=<id> StatusBar, ...` while
-  # API 29 prints `name='Window{<id> u0 StatusBar}', ...`. Match the bar name anywhere on the line
-  # so both work; a mismatch here silently reported zero bars and scored real system-bar shadowing
-  # as an app failure.
-  thickness=$($ADB shell dumpsys input 2>/dev/null | tr -d '' | awk '
-    /(StatusBar|Taskbar|NavigationBar)/ {
-      if (match($0, /touchableRegion=\[[0-9-]+,[0-9-]+\]\[[0-9-]+,[0-9-]+\]/)) {
-        region = substr($0, RSTART, RLENGTH)
-        gsub(/touchableRegion=\[|\]/, "", region); gsub(/\[/, ",", region)
-        split(region, v, ",")
-        w = v[3] - v[1]; h = v[4] - v[2]
-        if (w > 0 && h > 0) print (w < h ? w : h)
-      }
-    }' | sort -rn | head -1)
-  [ -z "${thickness:-}" ] && return 0
-  [ "$thickness" -le 0 ] && return 0
-  echo "0 0 $sw $thickness"
-}
 
 # True when (x,y) falls inside any system-bar touchable region.
 in_system_bar() {
@@ -224,6 +141,35 @@ dismiss_shade() {
   esac
 }
 
+# Collapse the notification shade, but do not send HOME. HOME on a tablet/phone that pins
+# orientation silently rotates the display back to 0, so a landscape probe would then be
+# scoring against a portrait overlay. Overlay windows sit above the current app, so they
+# consume the tap even when a non-launcher app is in front -- as long as that app is not a
+# system dialog (already handled by dismiss_shade).
+settle_foreground() {
+  dismiss_shade
+  wait_for_input_regions </dev/null
+}
+
+# Waits until the input system's overlay regions stop moving.
+#
+# After a rotation the window manager reports new positions before the input system finishes
+# re-registering the windows, so a probe fired too early taps where the windows used to be. That
+# produced results that swung between 0/18 and 18/18 for the same configuration. Polling until two
+# consecutive reads agree makes a run reproducible.
+wait_for_input_regions() {
+  local previous="" current=""
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    current=$(ov_rects </dev/null)
+    if [ -n "$current" ] && [ "$current" = "$previous" ]; then
+      return 0
+    fi
+    previous="$current"
+    sleep 2
+  done
+  return 0
+}
+
 # Counts blocked-tap log lines whose coordinate matches one of the taps this run actually sent.
 # Counting every "blocked tap" line instead let stale lines from a previous probe inflate the
 # result, which showed up as leaks that varied run to run (2, then 0, then 10 out of 24).
@@ -232,8 +178,7 @@ count_matching_blocks() {
   log=$($ADB logcat -d -s PointOverlayView:D 2>/dev/null | grep "blocked tap")
   for pair in $sent; do
     px=${pair%,*}; py=${pair#*,}
-    if printf '%s
-' "$log" | grep -q "blocked tap x=$px.0 y=$py.0"; then
+    if printf '%s\n' "$log" | grep -q "blocked tap x=$px.0 y=$py.0"; then
       hits=$((hits + 1))
     fi
   done
@@ -244,7 +189,7 @@ probe_taps() {
   local blocked=0 total=0 sw sh sent=""
   read -r sw sh < <(screen_wh)
   local bars; bars=$(system_bar_rows)
-  dismiss_shade
+  settle_foreground
   # ov_rects must be captured up front: `adb shell` reads stdin and would eat the loop's input.
   local rects; rects=$(ov_rects)
   $ADB logcat -c; sleep 1; $ADB logcat -c
@@ -270,9 +215,11 @@ probe_taps() {
       total=$((total + 1))
       sent="$sent$px,$py "
       # A tap that lands near the top edge can drag the shade open; clear it before continuing so
-      # the remaining taps in this run are still delivered to the overlay.
+      # the remaining taps in this run are still delivered to the overlay. stdin is redirected
+      # because the adb calls inside would otherwise consume the enclosing loop's input and
+      # silently drop every remaining row.
       if [ "$py" -lt 200 ]; then
-        dismiss_shade
+        dismiss_shade </dev/null
       fi
     done
   done <<<"$rects"
@@ -288,7 +235,7 @@ probe_outside() {
   local leaked=0 total=0 sw sh sent=""
   read -r sw sh < <(screen_wh)
   local rects; rects=$(ov_rects)
-  dismiss_shade
+  settle_foreground
   $ADB logcat -c; sleep 1; $ADB logcat -c
   while read -r x y w h; do
     [ -z "${h:-}" ] && continue
@@ -312,7 +259,7 @@ probe_outside() {
       total=$((total + 1))
       sent="$sent$px,$py "
       if [ "$py" -lt 200 ]; then
-        dismiss_shade
+        dismiss_shade </dev/null
       fi
     done
   done <<<"$rects"
@@ -339,8 +286,16 @@ switch_xy() {
 
 # Toggles the overlay off then on, guaranteeing a user-initiated START (which plays the fade).
 toggle_restart() {
-  $ADB shell am start -n $PKG/.MainActivity >/dev/null 2>&1
-  sleep 3
+  # `am start` returns before the window becomes focusable, so reading the switch straight after it
+  # found nothing and the overlay was never toggled. `-W` waits for the launch to settle, and the
+  # focus poll covers the case where another app (launcher, a system dialog) still owns focus.
+  $ADB shell am start -W -n $PKG/.MainActivity >/dev/null 2>&1
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    $ADB shell dumpsys window 2>/dev/null | grep -q "mCurrentFocus.*$PKG/" && break
+    $ADB shell am start -W -n $PKG/.MainActivity >/dev/null 2>&1
+    sleep 2
+  done
+  sleep 2
   local xy; xy=$(switch_xy)
   if [ -z "$xy" ]; then
     # The switch can be scrolled out of view; scroll the form back to the top and retry.
@@ -349,8 +304,12 @@ toggle_restart() {
     xy=$(switch_xy) || { echo "switch not found" >&2; return 1; }
   fi
   set -- $xy
-  $ADB shell input tap "$1" "$2" </dev/null >/dev/null 2>&1; sleep 3
-  $ADB shell input tap "$1" "$2" </dev/null >/dev/null 2>&1; sleep 4
+  # Always tap once. The seed writes overlay_should_be_enabled=true, so if the UI already shows
+  # ON this is a no-op for the flag and a START_OVERLAY is not sent -- in that case we start the
+  # service explicitly. If the UI shows OFF, one tap turns it on.
+  $ADB shell input tap "$1" "$2" </dev/null >/dev/null 2>&1; sleep 5
+  $ADB shell am start-foreground-service -n $PKG/.OverlayService -a $PKG.action.START_OVERLAY >/dev/null 2>&1     || $ADB shell am startservice -n $PKG/.OverlayService -a $PKG.action.START_OVERLAY >/dev/null 2>&1
+  sleep 3
   # Return to the launcher: the app's own window is immersive and hides the system bars, so
   # probing while it is in front would not reflect what a user sees in another app.
   $ADB shell input keyevent KEYCODE_HOME </dev/null >/dev/null 2>&1
